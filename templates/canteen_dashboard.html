@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Canteen Dashboard | Smart Event Crowd Management{% endblock %}
+
+{% block content %}
+<div class="mb-4 page-header reveal">
+  <h1 class="h3 mb-1 fw-bold" style="font-family: 'Syne', sans-serif;">Canteen Dashboard</h1>
+  <p class="text-muted mb-0">Scan food coupons and track redemptions.</p>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100 d-flex align-items-center justify-content-center">
+      <div class="card-body text-center">
+        <a href="{{ url_for('export_coupon_history_pdf') }}" class="btn btn-outline-info btn-lg w-100">
+          <i class="bi bi-file-earmark-pdf me-2"></i>Export History PDF
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4 reveal reveal-delay-1">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center">
+        <p class="text-muted small text-uppercase letter-spacing-05 mb-1">Total Coupons Redeemed</p>
+        <h3 class="display-6 fw-bold mb-0" style="font-family: 'Syne', sans-serif; background: linear-gradient(135deg, #fff, var(--muted)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">{{ total_coupons }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center">
+        <p class="text-muted small text-uppercase letter-spacing-05 mb-1">Today's Redemptions</p>
+        <h3 class="display-6 fw-bold mb-0" style="font-family: 'Syne', sans-serif; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">{{ today_coupons }}</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 reveal reveal-delay-2">
+  <div class="col-lg-6">
+    <div class="card shadow-sm border-0 mb-4 h-100">
+      <div class="card-body">
+        <h2 class="h5 mb-3 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Food Coupon Scanner</h2>
+        <p class="small text-muted mb-3">
+          Scan student food coupons here. Each scan will be logged to this dashboard.
+        </p>
+        <button class="btn btn-primary btn-sm" onclick="startScanner('food')">Scan Coupon</button>
+        <div id="reader" style="width:100%; max-width:300px; margin-top:20px;"></div>
+        <p id="scan-result" class="small mt-2 mb-0"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <h2 class="h5 mb-3 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Redemptions by User</h2>
+        {% if by_user %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>User</th>
+                <th>Coupons Scanned</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for name, count in by_user %}
+              <tr>
+                <td class="text-white">{{ name }}</td>
+                <td class="text-muted fw-bold">{{ count }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="small text-muted mb-0">No coupons scanned yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://unpkg.com/html5-qrcode"></script>
+{% endblock %}
+

@@ -1,0 +1,941 @@
+{% extends "base.html" %}
+
+{% block title %}Host Dashboard | Smart Event Crowd Management{% endblock %}
+
+{% block content %}
+<div class="mb-4 page-header reveal">
+  <h1 class="h3 mb-1 fw-bold" style="font-family: 'Syne', sans-serif;">Host Dashboard</h1>
+  <p class="text-muted mb-0">Monitor your events, control crowd flow, and manage your team.</p>
+</div>
+
+<div class="row g-4">
+  <!-- Left Column: Event Overviews -->
+  <div class="col-lg-8">
+    {% if not events %}
+    <div class="card shadow-sm h-100 d-flex align-items-center justify-content-center py-5 reveal reveal-delay-1">
+      <div class="text-center">
+        <p class="text-muted mb-1">You don't have any events assigned yet.</p>
+        <p class="text-muted small">Use the form on the right to create your first event.</p>
+      </div>
+    </div>
+    {% else %}
+    <!-- A. Live Event Overview Panel -->
+    <div class="card shadow-sm mb-4 border-0 reveal reveal-delay-1">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h5 mb-0 fw-bold" style="font-family: 'Syne', sans-serif;">Live Event Overview</h2>
+          <span class="small text-muted">Panel A</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Event</th>
+                <th>Total Registered</th>
+                <th>Inside</th>
+                <th>Remaining</th>
+                <th>Status</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for event in events %}
+              {% set total = tickets_by_event.get(event.id, 0) %}
+              {% set remaining = event.max_capacity - event.current_count %}
+              <tr data-event-id="{{ event.id }}">
+                <td>
+                  <div class="fw-semibold text-white">{{ event.name }}</div>
+                  <small class="text-muted">{{ event.location }}</small>
+                </td>
+                <td class="event-total-registered text-muted">{{ total }}</td>
+                <td class="event-current-count text-white fw-bold">{{ event.current_count }}</td>
+                <td class="event-remaining text-muted">{{ remaining if remaining > 0 else 0 }}</td>
+                <td>
+                  <span class="badge status-badge status-{{ event.status }} event-status-badge">
+                    {{ event.status|capitalize }}
+                  </span>
+                </td>
+                <td class="text-end">
+                  <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('edit_event', event_id=event.id) }}" class="btn btn-sm btn-outline-warning d-flex align-items-center justify-content-center" title="Edit Event" style="width: 32px; height: 32px;">
+                      <i class="bi bi-pencil"></i>
+                    </a>
+                    <a href="{{ url_for('export_enrollments_pdf', event_id=event.id) }}" class="btn btn-sm btn-outline-info d-flex align-items-center justify-content-center" title="Export Enrollments" style="width: 32px; height: 32px;">
+                      <i class="bi bi-file-earmark-pdf"></i>
+                    </a>
+                    <form action="{{ url_for('delete_event', event_id=event.id) }}" method="POST" class="m-0" onsubmit="return confirm('Are you sure you want to delete this event? This will also delete all associated tickets and data.');">
+                      <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center" title="Delete Event" style="width: 32px; height: 32px;">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- B. Gate-Wise Crowd Panel -->
+    <div class="card shadow-sm mb-4 border-0 reveal reveal-delay-2">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h5 mb-0 fw-bold" style="font-family: 'Syne', sans-serif;">Gate-wise Crowd</h2>
+          <span class="small text-muted">Panel B</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle mb-0" id="gate-wise-table">
+            <thead class="table-light">
+              <tr>
+                <th>Event</th>
+                <th>Gate</th>
+                <th>Entries</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for event in events %}
+              {% set gates = gates_by_event.get(event.id, []) %}
+              {% if gates %}
+                <tr class="table-group-divider"><td colspan="4" class="py-2 bg-surface small fw-bold text-accent2 px-3">{{ event.name }}</td></tr>
+                {% for gate in gates %}
+                {% set gate_ratio = (gate.net_count / event.max_capacity) if event.max_capacity > 0 else 0 %}
+                {% if gate_ratio < event.safe_threshold %}
+                  {% set gate_status = "normal" %}
+                {% elif gate_ratio < event.warning_threshold %}
+                  {% set gate_status = "warning" %}
+                {% else %}
+                  {% set gate_status = "critical" %}
+                {% endif %}
+                <tr data-gate-id="{{ gate.id }}" data-event-id-parent="{{ event.id }}">
+                  <td></td>
+                  <td class="text-white fw-semibold">{{ gate.name }}</td>
+                  <td class="gate-count text-white fw-bold">{{ gate.net_count }}</td>
+                  <td>
+                    <span class="badge status-badge status-{{ gate_status }} gate-status-badge">
+                      {{ gate_status|capitalize }}
+                    </span>
+                  </td>
+                </tr>
+                {% endfor %}
+              {% endif %}
+              {% endfor %}
+              {% if not gates_by_event.values()|map('length')|sum %}
+              <tr><td colspan="4" class="text-center text-muted py-4 small">No gates configured for any event.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- C. Zone Monitoring Panel -->
+    <div class="card shadow-sm mb-4 border-0 reveal reveal-delay-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h5 mb-0 fw-bold" style="font-family: 'Syne', sans-serif;">Zone Monitoring</h2>
+          <span class="small text-muted">Panel C</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle mb-0" id="zone-monitoring-table">
+            <thead class="table-light">
+              <tr>
+                <th>Event</th>
+                <th>Zone</th>
+                <th>Capacity</th>
+                <th>Current</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for event in events %}
+              {% set zones = zones_by_event.get(event.id, []) %}
+              {% if zones %}
+                <tr class="table-group-divider"><td colspan="5" class="py-2 bg-surface small fw-bold text-accent2 px-3">{{ event.name }}</td></tr>
+                {% for zone in zones %}
+                {% set z_ratio = (zone.current_count / zone.max_capacity) if zone.max_capacity > 0 else 0 %}
+                {% if z_ratio < 0.7 %}
+                  {% set z_status = "normal" %}
+                {% elif z_ratio < 0.9 %}
+                  {% set z_status = "warning" %}
+                {% else %}
+                  {% set z_status = "critical" %}
+                {% endif %}
+                <tr data-zone-id="{{ zone.id }}" data-event-id-parent="{{ event.id }}">
+                  <td></td>
+                  <td class="text-white fw-semibold">{{ zone.name }}</td>
+                  <td class="text-muted">{{ zone.max_capacity }}</td>
+                  <td class="zone-count text-white fw-bold">{{ zone.current_count }}</td>
+                  <td>
+                    <span class="badge status-badge status-{{ z_status }} zone-status-badge">
+                      {{ z_status|capitalize }}
+                    </span>
+                  </td>
+                </tr>
+                {% endfor %}
+              {% endif %}
+              {% endfor %}
+              {% if not zones_by_event.values()|map('length')|sum %}
+              <tr><td colspan="5" class="text-center text-muted py-4 small">No zones configured for any event.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- G. Reports & Logs Panel -->
+    <div class="card shadow-sm border-0 reveal reveal-delay-4">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h5 mb-0 fw-bold" style="font-family: 'Syne', sans-serif;">Reports & Logs</h2>
+          <span class="small text-muted">Panel G</span>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-12 mb-3">
+            <h3 class="h6 mb-3 fw-bold text-accent2">
+              <i class="bi bi-qr-code me-2"></i>Pass Generation History (Enrollments)
+            </h3>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Member</th>
+                    <th>Team</th>
+                    <th>Registered By</th>
+                    <th>Event</th>
+                    <th>Generated At</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for t in pass_history[:15] %}
+                  <tr>
+                    <td class="text-white small fw-bold">
+                      {{ t.guest_name if t.guest_name else t.student.name }}
+                    </td>
+                    <td class="text-accent2 small fw-bold">{{ t.team_name or 'Individual' }}</td>
+                    <td class="text-muted small">{{ t.student.name }}</td>
+                    <td class="text-muted small">{{ t.event.name }}</td>
+                    <td class="text-muted small">{{ t.created_at.strftime('%d %b, %H:%M') }}</td>
+                    <td>
+                      {% if t.checked_in %}
+                        <span class="badge bg-success small" style="font-size: 0.65rem;">Checked In</span>
+                      {% elif t.paid %}
+                        <span class="badge status-normal small" style="font-size: 0.65rem;">Paid</span>
+                      {% else %}
+                        <span class="badge status-critical small" style="font-size: 0.65rem;">Pending</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="5" class="text-center text-muted py-3 small">No passes generated yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <h3 class="h6 mb-3 fw-bold text-accent2">
+              <i class="bi bi-clock-history me-2"></i>Entry Logs
+            </h3>
+            <div class="small">
+              {% if not entry_logs %}
+              <div class="text-center py-4 text-muted border rounded-3 border-dashed">
+                <p class="mb-0">No recent check-ins.</p>
+              </div>
+              {% else %}
+              <div class="list-group list-group-flush bg-transparent">
+                {% for ticket in entry_logs %}
+                <div class="list-group-item bg-transparent border-bottom-0 px-0 py-2">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                      <div class="text-white fw-semibold">{{ ticket.student.name }}</div>
+                      <a href="{{ url_for('edit_event', event_id=ticket.event_id) }}" class="text-muted text-decoration-none hover-link" style="font-size: 0.75rem;">
+                        {{ ticket.event.name }}
+                      </a>
+                    </div>
+                    <span class="badge bg-surface text-muted fw-normal">
+                      {{ ticket.checked_in_at.strftime('%H:%M') if ticket.checked_in_at }}
+                    </span>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <h3 class="h6 mb-3 fw-bold text-accent2">
+              <i class="bi bi-download me-2"></i>Data Exports
+            </h3>
+            <div class="p-3 rounded-3 bg-surface border border-secondary border-opacity-10 mb-3">
+              <p class="small text-muted mb-3">
+                Download detailed analytical reports in PDF or Excel format for offline processing.
+              </p>
+              <div class="d-flex flex-wrap gap-2">
+                <a href="{{ url_for('export_entry_logs_pdf') }}" class="btn btn-sm btn-outline-info flex-grow-1">
+                  <i class="bi bi-file-earmark-pdf me-1"></i>Entry PDF
+                </a>
+                <a href="{{ url_for('export_entry_logs_excel') }}" class="btn btn-sm btn-outline-success flex-grow-1">
+                  <i class="bi bi-file-earmark-excel me-1"></i>Entry Excel
+                </a>
+              </div>
+              <div class="d-flex flex-wrap gap-2 mt-2">
+                <a href="{{ url_for('export_host_food_history_pdf') }}" class="btn btn-sm btn-outline-info flex-grow-1">
+                  <i class="bi bi-file-earmark-pdf me-1"></i>Food PDF
+                </a>
+                <a href="{{ url_for('export_enrollment_history_excel') }}" class="btn btn-sm btn-outline-success flex-grow-1">
+                  <i class="bi bi-file-earmark-excel me-1"></i>Pass Excel
+                </a>
+              </div>
+            </div>
+            <div class="alert alert-info alert-sm py-2 px-3 border-0 small" style="background: rgba(13,202,240,0.05); color: #0dcaf0;">
+              <i class="bi bi-info-circle me-2"></i> More analytical reports are being prepared.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Setup & Management Panel -->
+    <div class="card shadow-sm mb-4 border-0 reveal reveal-delay-3">
+      <div class="card-body">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-4 gap-3">
+          <h2 class="h5 mb-0 fw-bold" style="font-family: 'Syne', sans-serif;">Event Setup & Management</h2>
+          <div class="w-100" style="max-width: 250px;">
+            <select id="config-event-select" class="form-select form-select-sm" onchange="updateConfigForms(this.value)">
+              <option value="">Choose Event...</option>
+              {% for event in events %}
+              <option value="{{ event.id }}">{{ event.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div id="config-forms-container" class="d-none">
+          <div class="row g-3 mb-4">
+            <!-- Add Zone Card -->
+            <div class="col-md-4">
+              <div class="p-3 rounded-3 bg-surface border border-secondary border-opacity-10 h-100 d-flex flex-column">
+                <h3 class="h6 mb-3 fw-bold text-accent2">Add Zone</h3>
+                <form id="zone-config-form" method="post" action="" class="flex-grow-1 d-flex flex-column">
+                  <div class="form-floating mb-2">
+                    <input type="text" class="form-control form-control-sm" name="name" placeholder="Zone Name" required />
+                    <label>Zone Name</label>
+                  </div>
+                  <div class="form-floating mb-3">
+                    <input type="number" class="form-control form-control-sm" name="max_capacity" placeholder="Capacity" required />
+                    <label>Max Capacity</label>
+                  </div>
+                  <button type="submit" class="btn btn-primary btn-sm w-100 py-2 shadow-sm mt-auto" style="background: linear-gradient(135deg, #7c5cfc, #c084fc);">
+                    Create Zone
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <!-- Add Gate Card -->
+            <div class="col-md-4">
+              <div class="p-3 rounded-3 bg-surface border border-secondary border-opacity-10 h-100 d-flex flex-column">
+                <h3 class="h6 mb-3 fw-bold text-accent2">Add Gate</h3>
+                <form id="gate-config-form" method="post" action="" class="flex-grow-1 d-flex flex-column">
+                  <div class="form-floating mb-3">
+                    <input type="text" class="form-control form-control-sm" name="name" placeholder="Gate Name" required />
+                    <label>Gate Name</label>
+                  </div>
+                  <button type="submit" class="btn btn-primary btn-sm w-100 py-2 shadow-sm mt-auto" style="background: linear-gradient(135deg, #7c5cfc, #c084fc);">
+                    Create Gate
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <!-- Add Time Slot Card -->
+            <div class="col-md-4">
+              <div class="p-3 rounded-3 bg-surface border border-secondary border-opacity-10 h-100 d-flex flex-column">
+                <h3 class="h6 mb-3 fw-bold text-accent2">Add Time Slot</h3>
+                <form id="timeslot-config-form" method="post" action="" class="flex-grow-1 d-flex flex-column">
+                  <div class="form-floating mb-2">
+                    <input type="datetime-local" class="form-control form-control-sm" name="start_time" required />
+                    <label>Start Time</label>
+                  </div>
+                  <div class="form-floating mb-2">
+                    <input type="datetime-local" class="form-control form-control-sm" name="end_time" required />
+                    <label>End Time</label>
+                  </div>
+                  <div class="form-floating mb-3">
+                    <input type="number" class="form-control form-control-sm" name="max_participants" placeholder="Max" required />
+                    <label>Max Participants</label>
+                  </div>
+                  <button type="submit" class="btn btn-primary btn-sm w-100 py-2 shadow-sm mt-auto" style="background: linear-gradient(135deg, #7c5cfc, #c084fc);">
+                    Create Time Slot
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- Announcement Row -->
+          <div class="p-3 rounded-3 bg-surface border border-secondary border-opacity-10">
+            <h3 class="h6 mb-3 fw-bold text-accent2">Create Announcement</h3>
+            <form method="post" action="{{ url_for('create_announcement') }}" class="vstack gap-2">
+              <input type="hidden" id="announcement_event_id" name="event_id" value="">
+              <div class="form-floating">
+                <input type="text" class="form-control" name="title" placeholder=" " required />
+                <label>Announcement Title</label>
+              </div>
+              <div class="form-floating">
+                <textarea class="form-control" name="message" placeholder=" " style="height: 100px" required></textarea>
+                <label>Message Content</label>
+              </div>
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <div class="form-floating">
+                    <select class="form-select" name="audience">
+                      <option value="all" selected>All Audiences</option>
+                      <option value="students">Students Only</option>
+                      <option value="faculty">Faculty Only</option>
+                      <option value="volunteers">Volunteers Only</option>
+                      <option value="security">Security Only</option>
+                    </select>
+                    <label>Target Audience</label>
+                  </div>
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                  <button type="submit" class="btn btn-primary w-100 py-2 shadow-sm" style="background: linear-gradient(135deg, #7c5cfc, #c084fc); height: 58px;">
+                    Post Announcement
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div id="config-placeholder" class="text-center py-5 text-muted border border-dashed rounded-3">
+          <i class="bi bi-gear-wide-connected h1 mb-3 d-block"></i>
+          <p>Please select an event from the dropdown to access setup controls.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right column: control, announcements, users -->
+  <div class="col-lg-4">
+    <!-- Quick Actions: Create Event -->
+    <div class="card shadow-sm mb-4 border-0 reveal reveal-delay-1" style="background: linear-gradient(135deg, rgba(124,92,252,0.1), rgba(192,132,252,0.05)); border: 1px solid rgba(124,92,252,0.2) !important;">
+      <div class="card-body">
+        <h2 class="h5 mb-3 fw-bold" style="font-family: 'Syne', sans-serif; color: var(--accent2);">Create New Event</h2>
+        <form method="post" action="{{ url_for('create_event') }}" class="vstack gap-2">
+          <div class="form-floating">
+            <input type="text" class="form-control" id="name" name="name" placeholder=" " required />
+            <label for="name">Event name</label>
+          </div>
+          <div class="form-floating">
+            <input type="text" class="form-control" id="location" name="location" placeholder=" " required />
+            <label for="location">Location</label>
+          </div>
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="form-floating">
+                <input type="datetime-local" class="form-control" id="start_time" name="start_time" placeholder=" " required />
+                <label for="start_time">Start time</label>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="form-floating">
+                <input type="datetime-local" class="form-control" id="end_time" name="end_time" placeholder=" " required />
+                <label for="end_time">End time</label>
+              </div>
+            </div>
+          </div>
+          <div class="form-floating">
+            <select class="form-select" id="event_type" name="event_type" placeholder=" ">
+              <option value="general">General Event</option>
+              <option value="cultural">Cultural Fest</option>
+              <option value="technical">Technical Event</option>
+              <option value="sports">Sports Event</option>
+              <option value="seminar">Seminar/Lecture</option>
+              <option value="convocation">Convocation</option>
+            </select>
+            <label for="event_type">Event Type</label>
+          </div>
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="form-floating">
+                <input type="number" min="1" class="form-control" id="max_capacity" name="max_capacity" placeholder=" " required />
+                <label for="max_capacity">Capacity</label>
+              </div>
+            </div>
+            <div class="col-3">
+              <div class="form-floating">
+                <input type="number" min="1" max="100" class="form-control" id="safe_threshold" name="safe_threshold" value="70" placeholder=" " />
+                <label for="safe_threshold">Safe %</label>
+              </div>
+            </div>
+            <div class="col-3">
+              <div class="form-floating">
+                <input type="number" min="1" max="100" class="form-control" id="warning_threshold" name="warning_threshold" value="90" placeholder=" " />
+                <label for="warning_threshold">Warn %</label>
+              </div>
+            </div>
+          </div>
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="form-floating">
+                <select class="form-select" id="is_paid" name="is_paid" placeholder=" " onchange="togglePrice(this, 'price_field')">
+                  <option value="0" selected>Free</option>
+                  <option value="1">Paid</option>
+                </select>
+                <label for="is_paid">Pricing</label>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="form-floating" id="price_field" style="display: none;">
+                <input type="number" step="0.01" min="0" class="form-control" id="price" name="price" value="0.00" placeholder=" " disabled />
+                <label for="price">Price (₹)</label>
+              </div>
+            </div>
+          </div>
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="form-check form-switch p-3 border rounded bg-surface">
+                <input class="form-check-input ms-0 me-2" type="checkbox" id="is_group_event" name="is_group_event" value="1" onchange="toggleGroupSize(this, 'group_size_field')">
+                <label class="form-check-label text-white" for="is_group_event">Group Event</label>
+              </div>
+            </div>
+            <div class="col-6" id="group_size_field" style="display: none;">
+              <div class="form-floating">
+                <input type="number" class="form-control" id="group_size" name="group_size" value="1" min="2" placeholder=" " disabled />
+                <label for="group_size">Max Members</label>
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary w-100 mt-2">Create event</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Coupon Overview -->
+    <div class="card shadow-sm mb-4 border-0">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h5 mb-0 fw-bold" style="font-family: 'Syne', sans-serif;">Food Coupon Stats</h2>
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown">
+              Export History
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="{{ url_for('export_host_food_history_pdf') }}"><i class="bi bi-file-earmark-pdf me-2"></i>PDF Report</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('export_host_food_history_excel') }}"><i class="bi bi-file-earmark-excel me-2"></i>Excel Sheet</a></li>
+            </ul>
+          </div>
+        </div>
+        <p class="small text-muted mb-3">
+          Summary of your food coupons with item and expiry details.
+        </p>
+        <div class="d-flex justify-content-between small mb-3 p-2 rounded-3" style="background: rgba(255,255,255,0.03);">
+          <span class="text-muted">Total redeemed</span>
+          <span class="fw-bold text-white">{{ total_coupons }}</span>
+        </div>
+
+        <div class="table-responsive mb-3">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Coupon</th>
+                <th>Food Item</th>
+                <th>Expiry</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in coupons %}
+              <tr>
+                <td class="small text-white">{{ c.coupon_name }}</td>
+                <td class="small text-white">{{ c.food_item }}</td>
+                <td class="small text-muted">
+                  {% if c.expiry_date %}
+                    {{ c.expiry_date.strftime('%d %b %Y') }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td class="small">
+                  {% if c.used %}
+                    <span class="badge status-normal">Used</span>
+                  {% elif c.expiry_date and c.expiry_date < now %}
+                    <span class="badge status-critical">Expired</span>
+                  {% else %}
+                    <span class="badge status-blocked">Pending</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="4" class="small text-muted text-center py-3">
+                  No coupons created yet.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mt-2 vstack gap-2">
+          <a href="{{ url_for('export_entry_logs_pdf') }}" class="btn btn-outline-info w-100">
+            <i class="bi bi-file-earmark-pdf me-2"></i>Export Entry Logs PDF
+          </a>
+          <a href="{{ url_for('create_coupon') }}" class="btn btn-sm btn-primary w-100">
+            Create Food Coupon
+          </a>
+          <a href="{{ url_for('coupon_report') }}" class="btn btn-sm btn-outline-secondary w-100">
+            View Full Report
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- D. Crowd Control Actions -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h5 mb-0">Crowd Control</h2>
+          <span class="small text-muted">Panel D</span>
+        </div>
+        <p class="small text-muted mb-3">
+          Adjust thresholds and manage entry for each event.
+        </p>
+        {% for event in events %}
+        <div class="border rounded-3 p-2 mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <strong class="small">{{ event.name }}</strong>
+            <span class="badge status-badge status-{{ event.status }}">{{ event.status|capitalize }}</span>
+          </div>
+          <form
+            class="row g-2 align-items-center"
+            method="post"
+            action="{{ url_for('update_event_thresholds', event_id=event.id) }}"
+          >
+            <div class="col-12">
+              <small class="text-muted d-block mb-1">Set overcrowding thresholds (%)</small>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">Safe</span>
+                <input
+                  type="number"
+                  class="form-control"
+                  name="safe_threshold"
+                  value="{{ (event.safe_threshold * 100) | round(0) | int }}"
+                  min="10"
+                  max="95"
+                />
+                <span class="input-group-text">Warn</span>
+                <input
+                  type="number"
+                  class="form-control"
+                  name="warning_threshold"
+                  value="{{ (event.warning_threshold * 100) | round(0) | int }}"
+                  min="20"
+                  max="100"
+                />
+              </div>
+            </div>
+          </form>
+          <div class="d-flex gap-2 mt-2">
+            {% if event.entry_blocked %}
+            <form method="post" action="{{ url_for('unblock_event_entry', event_id=event.id) }}">
+              <button type="submit" class="btn btn-sm btn-success">Resume Entry</button>
+            </form>
+            {% else %}
+            <form method="post" action="{{ url_for('block_event_entry', event_id=event.id) }}">
+              <button type="submit" class="btn btn-sm btn-warning">Block Entry</button>
+            </form>
+            {% endif %}
+            <button type="button" class="btn btn-sm btn-outline-danger" disabled>
+              Emergency Mode (coming soon)
+            </button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- QR Code Scanner -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <h2 class="h5 mb-3">QR Code Scanner</h2>
+        <div id="mobile-security-notice" class="d-none alert alert-warning small py-2 mb-3">
+          <strong>⚠️ HTTPS Required:</strong> Mobile browsers block camera access over plain HTTP ({{ request.host }}). 
+          Please use <strong>HTTPS</strong> or a tunnel like <strong>ngrok</strong>.
+        </div>
+        <p class="small text-muted mb-3">
+          Use this scanner to verify attendee QR passes at host checkpoints.
+        </p>
+        <button class="btn btn-primary btn-sm" onclick="startScanner('entry')">Scan QR Code</button>
+        <div id="reader" style="width:100%; max-width:300px; margin-top:20px;"></div>
+        <p id="scan-result" class="small mt-2 mb-0"></p>
+      </div>
+    </div>
+
+    <!-- F. User Management Panel -->
+    <div class="card shadow-sm border-0 reveal reveal-delay-5">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h2 class="h5 mb-0 fw-bold" style="font-family: 'Syne', sans-serif;">User Management</h2>
+          <span class="small text-muted">Panel F</span>
+        </div>
+        <div class="row g-4">
+          <div class="col-12">
+            <h3 class="h6 mb-3 fw-semibold text-white">Faculty Coordinators</h3>
+            <div class="table-responsive">
+              <table class="table align-middle mb-0" style="width: 100%;">
+                <thead>
+                  <tr>
+                    <th style="white-space: nowrap;">Name</th>
+                    <th style="white-space: nowrap;">Email</th>
+                    <th class="text-end" style="white-space: nowrap; width: 40px;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for user in faculty_users %}
+                  <tr>
+                    <td class="text-white fw-semibold text-truncate" style="max-width: 80px;" title="{{ user.name }}">{{ user.name }}</td>
+                    <td class="small text-muted text-truncate" style="max-width: 120px;" title="{{ user.email }}">{{ user.email }}</td>
+                    <td class="text-end">
+                      <div class="d-flex justify-content-end">
+                        <form action="{{ url_for('remove_user', user_id=user.id) }}" method="post" class="m-0" onsubmit="return confirm('Are you sure you want to remove this user?');">
+                          <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center" title="Remove User" style="width: 28px; height: 28px;">
+                            <i class="bi bi-person-x" style="font-size: 0.8rem;"></i>
+                          </button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="3" class="small text-muted py-3">No faculty coordinators found.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="col-12">
+            <h3 class="h6 mb-3 fw-semibold text-white">Volunteers</h3>
+            <div class="table-responsive">
+              <table class="table align-middle mb-0" style="width: 100%;">
+                <thead>
+                  <tr>
+                    <th style="white-space: nowrap;">Name</th>
+                    <th style="white-space: nowrap;">Email</th>
+                    <th class="text-end" style="white-space: nowrap; width: 40px;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for user in volunteer_users %}
+                  <tr>
+                    <td class="text-white fw-semibold text-truncate" style="max-width: 80px;" title="{{ user.name }}">{{ user.name }}</td>
+                    <td class="small text-muted text-truncate" style="max-width: 120px;" title="{{ user.email }}">{{ user.email }}</td>
+                    <td class="text-end">
+                      <div class="d-flex justify-content-end">
+                        <form action="{{ url_for('remove_user', user_id=user.id) }}" method="post" class="m-0" onsubmit="return confirm('Are you sure you want to remove this user?');">
+                          <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center" title="Remove User" style="width: 28px; height: 28px;">
+                            <i class="bi bi-person-x" style="font-size: 0.8rem;"></i>
+                          </button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="3" class="small text-muted py-3">No volunteers found.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <p class="small text-muted mt-3 mb-0 p-2 rounded-3" style="background: rgba(255,255,255,0.03);">
+          Note: User assignment and role management are currently admin-only actions.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Periodically refresh host live overview table so counts follow scanner activity
+  function refreshHostEvents() {
+    // 1. Refresh main event table
+    document.querySelectorAll('tr[data-event-id]').forEach(function (row) {
+      const eventId = row.getAttribute('data-event-id');
+      fetch(`/api/events/${eventId}`)
+        .then(res => res.json())
+        .then(data => {
+          const current = data.current_count;
+          const maxCap = data.max_capacity;
+          const remaining = Math.max(0, maxCap - current);
+          const status = data.status;
+
+          const currentEl = row.querySelector('.event-current-count');
+          const remainingEl = row.querySelector('.event-remaining');
+          const badgeEl = row.querySelector('.event-status-badge');
+
+          if (currentEl) currentEl.textContent = current;
+          if (remainingEl) remainingEl.textContent = remaining;
+          if (badgeEl) {
+            badgeEl.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+            badgeEl.className = `badge status-badge status-${status} event-status-badge`;
+          }
+
+          // 2. Refresh gates in this event
+          data.gates.forEach(gate => {
+            const gateRow = document.querySelector(`tr[data-gate-id="${gate.id}"]`);
+            if (gateRow) {
+              const countEl = gateRow.querySelector('.gate-count');
+              const badgeEl = gateRow.querySelector('.gate-status-badge');
+              if (countEl) countEl.textContent = gate.net_count;
+              
+              // Recalculate gate status based on event capacity
+              const ratio = gate.net_count / maxCap;
+              let gStatus = 'normal';
+              if (ratio >= data.warning_threshold) gStatus = 'critical';
+              else if (ratio >= data.safe_threshold) gStatus = 'warning';
+              
+              if (badgeEl) {
+                badgeEl.textContent = gStatus.charAt(0).toUpperCase() + gStatus.slice(1);
+                badgeEl.className = `badge status-badge status-${gStatus} gate-status-badge`;
+              }
+            }
+          });
+
+          // 3. Refresh zones in this event
+          data.zones.forEach(zone => {
+            const zoneRow = document.querySelector(`tr[data-zone-id="${zone.id}"]`);
+            if (zoneRow) {
+              const countEl = zoneRow.querySelector('.zone-count');
+              const badgeEl = zoneRow.querySelector('.zone-status-badge');
+              if (countEl) countEl.textContent = zone.current_count;
+              
+              const ratio = zone.current_count / zone.max_capacity;
+              let zStatus = 'normal';
+              if (ratio >= 0.9) zStatus = 'critical';
+              else if (ratio >= 0.7) zStatus = 'warning';
+              
+              if (badgeEl) {
+                badgeEl.textContent = zStatus.charAt(0).toUpperCase() + zStatus.slice(1);
+                badgeEl.className = `badge status-badge status-${zStatus} zone-status-badge`;
+              }
+            }
+          });
+        })
+        .catch(() => {
+          // ignore errors in periodic refresh
+        });
+    });
+  }
+
+  // Refresh every 5 seconds
+  setInterval(refreshHostEvents, 5000);
+
+  // Setup configuration form actions based on selected event
+  function updateConfigForms(eventId) {
+    const container = document.getElementById('config-forms-container');
+    const placeholder = document.getElementById('config-placeholder');
+    const announcementEventId = document.getElementById('announcement_event_id');
+    
+    if (!eventId) {
+      container.classList.add('d-none');
+      placeholder.classList.remove('d-none');
+      if (announcementEventId) announcementEventId.value = '';
+      return;
+    }
+    
+    container.classList.remove('d-none');
+    placeholder.classList.add('d-none');
+    
+    // Update form actions
+    document.getElementById('zone-config-form').action = `/events/${eventId}/zones/create`;
+    document.getElementById('gate-config-form').action = `/events/${eventId}/gates/create`;
+    document.getElementById('timeslot-config-form').action = `/events/${eventId}/time-slots/create`;
+    
+    // Update hidden field for announcement
+    if (announcementEventId) announcementEventId.value = eventId;
+  }
+
+  // Mobile Scanner implementation for Host Dashboard
+  let html5QrcodeScanner = null;
+
+  function startScanner() {
+    const qrRegionId = "reader";
+    const resultDiv = document.getElementById('scan-result');
+    
+    if (html5QrcodeScanner) {
+      html5QrcodeScanner.clear();
+    }
+
+    // HTTPS/Secure Context check
+    if (!window.isSecureContext && window.location.hostname !== "localhost") {
+      document.getElementById('mobile-security-notice').classList.remove('d-none');
+      return;
+    }
+
+    const config = {
+      fps: 15,
+      qrbox: { width: 250, height: 250 },
+      aspectRatio: 1.0,
+      videoConstraints: {
+        facingMode: "environment"
+      }
+    };
+
+    html5QrcodeScanner = new Html5QrcodeScanner(qrRegionId, config, false);
+    
+    html5QrcodeScanner.render((decodedText) => {
+      // Extract token (same logic as volunteer scanner)
+      let token = decodedText.trim();
+      if (token.includes('/')) {
+        const parts = token.split('/').filter(Boolean);
+        token = parts[parts.length - 1];
+      }
+
+      resultDiv.innerHTML = '<div class="spinner-border spinner-border-sm text-primary"></div> Verifying...';
+      
+      fetch(`/api/verify/${token}`)
+        .then(res => res.json())
+        .then(data => {
+          let alertClass = 'alert-info';
+          if (data.status === 'ok') alertClass = 'alert-success';
+          else if (data.status === 'invalid' || data.status === 'blocked') alertClass = 'alert-danger';
+          else alertClass = 'alert-warning';
+
+          resultDiv.innerHTML = `
+            <div class="alert ${alertClass} py-2 small mt-3">
+              <strong>${data.status === 'ok' ? '✓' : '✗'} ${data.status.toUpperCase()}</strong><br>
+              ${data.message || (data.status === 'ok' ? data.student_name : 'Error')}
+            </div>`;
+          
+          if (data.status === 'ok') {
+            refreshHostEvents(); // Update counts
+          }
+        })
+        .catch(() => {
+          resultDiv.innerHTML = '<div class="alert alert-danger py-2 small mt-3">Connection error</div>';
+        });
+
+    }, (err) => {
+      // ignore
+    });
+  }
+</script>
+{% endblock %}
+
+

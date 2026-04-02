@@ -1,0 +1,374 @@
+{% extends "base.html" %}
+
+{% block title %}Volunteer QR Scanner | Smart Event Crowd Management{% endblock %}
+
+{% block content %}
+<div class="mb-4 page-header">
+  <h1 class="h3 mb-1">QR Code Scanner</h1>
+  <p class="mb-0">Scan QR codes to verify entry passes</p>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h5 mb-3">Select Event</h2>
+        <select id="event-select" class="form-select mb-3">
+          <option value="">Choose an event...</option>
+          {% for event in events %}
+          <option value="{{ event.id }}">{{ event.name }}</option>
+          {% endfor %}
+        </select>
+
+        <div id="event-info" class="d-none">
+          <div class="small text-muted mb-2">Current Status:</div>
+          <div class="mb-2">
+            <span id="event-status" class="badge"></span>
+          </div>
+          <div class="small mb-3">
+            <span id="event-count">0</span> / <span id="event-capacity">0</span> people
+          </div>
+
+          <div class="mb-3">
+            <label for="gate-select" class="form-label small">Assigned Gate</label>
+            <select id="gate-select" class="form-select form-select-sm">
+              <option value="">Select a gate (optional)</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label for="zone-select" class="form-label small">Assigned Zone</label>
+            <select id="zone-select" class="form-select form-select-sm">
+              <option value="">Select a zone (optional)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mt-3">
+      <div class="card-body">
+        <h2 class="h5 mb-3">Manual Entry</h2>
+        <div class="input-group mb-2">
+          <input type="text" id="manual-token" class="form-control" placeholder="Enter QR token">
+          <button class="btn btn-primary" onclick="verifyManual()">Verify</button>
+        </div>
+        <small class="text-muted">Or scan QR code with camera</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h2 class="h5 mb-3">Camera Scanner (Entry Only)</h2>
+        <p class="small text-muted mb-2">
+          Select an event, then point your camera at the student's pass QR code.
+        </p>
+        <div id="qr-reader" style="width:100%; max-width:480px; margin-inline:auto;"></div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h5 mb-3">Scan Result</h2>
+        <div id="scan-result" class="text-center py-5">
+          <p class="text-muted">Select an event and scan a QR code to verify</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mt-4">
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h5 mb-3">Recent Verifications</h2>
+        <div id="verification-log" class="small">
+          <p class="text-muted mb-0">No verifications yet</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let selectedEventId = null;
+let verificationLog = [];
+let isScanning = false;
+let lastScannedToken = null;
+let lastScanTime = 0;
+
+document.getElementById('event-select').addEventListener('change', function() {
+  selectedEventId = this.value;
+  if (selectedEventId) {
+    updateEventInfo(selectedEventId);
+    fetchRecentLogs(selectedEventId);
+  } else {
+    document.getElementById('event-info').classList.add('d-none');
+    fetchRecentLogs(); // Reset to show all or nothing based on preference, here we'll show all if nothing selected
+  }
+});
+
+function updateEventInfo(eventId) {
+  fetch(`/api/events/${eventId}`)
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById('event-info').classList.remove('d-none');
+      document.getElementById('event-status').textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+      document.getElementById('event-status').className = `badge status-badge status-${data.status}`;
+      document.getElementById('event-count').textContent = data.current_count;
+      document.getElementById('event-capacity').textContent = data.max_capacity;
+
+      // Populate gates
+      const gateSelect = document.getElementById('gate-select');
+      const currentGateId = gateSelect.value;
+      gateSelect.innerHTML = '<option value="">Select a gate (optional)</option>';
+      data.gates.forEach(gate => {
+        const opt = document.createElement('option');
+        opt.value = gate.id;
+        opt.textContent = gate.name;
+        if (String(gate.id) === currentGateId) opt.selected = true;
+        gateSelect.appendChild(opt);
+      });
+
+      // Populate zones
+      const zoneSelect = document.getElementById('zone-select');
+      const currentZoneId = zoneSelect.value;
+      zoneSelect.innerHTML = '<option value="">Select a zone (optional)</option>';
+      data.zones.forEach(zone => {
+        const opt = document.createElement('option');
+        opt.value = zone.id;
+        opt.textContent = zone.name;
+        if (String(zone.id) === currentZoneId) opt.selected = true;
+        zoneSelect.appendChild(opt);
+      });
+    });
+}
+
+function verifyManual() {
+  const token = document.getElementById('manual-token').value.trim();
+  if (!token) {
+    alert('Please enter a token');
+    return;
+  }
+  verifyQR(token);
+}
+
+// Extract the QR token from the scanned text.
+// It could be a raw token (hex string/UUID) or a full URL.
+function extractToken(raw) {
+  if (!raw) return '';
+  const trimmed = raw.trim();
+  
+  // If it's a full URL, we want the last part
+  if (trimmed.includes('/')) {
+    const parts = trimmed.split('/').filter(Boolean);
+    return parts[parts.length - 1];
+  }
+  
+  // Otherwise, assume it's the raw token
+  return trimmed;
+}
+
+function verifyQR(rawToken) {
+  console.log('DEBUG: Scanning raw data:', rawToken);
+  const token = extractToken(rawToken);
+  console.log('DEBUG: Extracted token:', token);
+  if (!token) {
+    displayResult({status: 'invalid', message: 'Invalid QR data'});
+    return;
+  }
+
+  const now = Date.now();
+  // If we're already processing a scan, or we just scanned this same token in the last 3 seconds
+  if (isScanning || (token === lastScannedToken && (now - lastScanTime) < 3000)) {
+    return;
+  }
+
+  isScanning = true;
+  lastScannedToken = token;
+  lastScanTime = now;
+
+  const gateId = document.getElementById('gate-select')?.value || '';
+  const zoneId = document.getElementById('zone-select')?.value || '';
+  
+  fetch(`/api/verify/${token}?gate_id=${gateId}&zone_id=${zoneId}`)
+    .then(res => res.json())
+    .then(data => {
+      displayResult(data);
+      if (data.status === 'ok') {
+        // If event not selected, infer from API response
+        if (!selectedEventId && data.event_id) {
+          selectedEventId = String(data.event_id);
+          const selectEl = document.getElementById('event-select');
+          if (selectEl) {
+            selectEl.value = selectedEventId;
+          }
+          updateEventInfo(selectedEventId);
+        } else if (selectedEventId) {
+          updateEventInfo(selectedEventId);
+        }
+
+        // Only add to log if it matches the currently selected event
+        if (!selectedEventId || String(data.event_id) === String(selectedEventId)) {
+          verificationLog.unshift({
+            time: new Date().toLocaleTimeString(),
+            student_name: data.student_name,
+            event_name: data.event_name,
+            event_id: data.event_id,
+            status: 'success'
+          });
+          if (verificationLog.length > 10) verificationLog.pop();
+          updateLog();
+        }
+      }
+    })
+    .catch(err => {
+      displayResult({status: 'error', message: 'Verification failed'});
+    })
+    .finally(() => {
+      // Allow new scans after a short delay
+      setTimeout(() => {
+        isScanning = false;
+      }, 1000);
+    });
+}
+
+function displayResult(data) {
+  const resultDiv = document.getElementById('scan-result');
+  let html = '';
+  let alertClass = 'alert-info';
+
+  if (data.status === 'ok') {
+    alertClass = 'alert-success';
+    html = `
+      <div class="alert ${alertClass}">
+        <h5>✓ Verified Successfully</h5>
+        <p class="mb-0"><strong>Student:</strong> ${data.student_name}<br>
+        <strong>Event:</strong> ${data.event_name}</p>
+      </div>
+    `;
+  } else if (data.status === 'invalid') {
+    alertClass = 'alert-danger';
+    html = `<div class="alert ${alertClass}"><strong>✗ Invalid Pass</strong><br>${data.message || 'Pass not found'}</div>`;
+  } else if (data.status === 'already_used') {
+    alertClass = 'alert-warning';
+    html = `<div class="alert ${alertClass}"><strong>⚠ Already Used</strong><br>This pass has already been scanned</div>`;
+  } else if (data.status === 'blocked') {
+    alertClass = 'alert-danger';
+    html = `<div class="alert ${alertClass}"><strong>✗ Entry Blocked</strong><br>Entry is currently blocked for this event</div>`;
+  } else {
+    alertClass = 'alert-warning';
+    html = `<div class="alert ${alertClass}"><strong>⚠ ${data.status}</strong><br>${data.message || 'Verification failed'}</div>`;
+  }
+
+  resultDiv.innerHTML = html;
+}
+
+function updateLog() {
+  const logDiv = document.getElementById('verification-log');
+  if (verificationLog.length === 0) {
+    logDiv.innerHTML = '<p class="text-muted mb-0">No verifications yet</p>';
+    return;
+  }
+  
+  let html = '<div class="list-group">';
+  verificationLog.forEach(log => {
+    html += `
+      <div class="list-group-item bg-dark text-white border-secondary mb-1">
+        <div class="d-flex justify-content-between">
+          <span>${log.student_name} - ${log.event_name}</span>
+          <span class="text-muted">${log.time}</span>
+        </div>
+      </div>
+    `;
+  });
+  html += '</div>';
+  logDiv.innerHTML = html;
+}
+
+function fetchRecentLogs(eventId = null) {
+  let url = '/api/recent_logs';
+  if (eventId) {
+    url += `?event_id=${eventId}`;
+  }
+  
+  fetch(url)
+    .then(res => res.json())
+    .then(data => {
+      verificationLog = data;
+      updateLog();
+    });
+}
+
+// Initial fetch
+document.addEventListener('DOMContentLoaded', () => {
+  const eventSelect = document.getElementById('event-select');
+  if (eventSelect && eventSelect.value) {
+    selectedEventId = eventSelect.value;
+    fetchRecentLogs(selectedEventId);
+  } else {
+    fetchRecentLogs();
+  }
+});
+
+// Auto-refresh event info every 5 seconds
+setInterval(() => {
+  if (selectedEventId) {
+    updateEventInfo(selectedEventId);
+  }
+}, 5000);
+
+// QR code scanner using device camera
+function onScanSuccess(decodedText /*, decodedResult */) {
+  // decodedText may be a full URL or just the token
+  verifyQR(decodedText);
+}
+
+function onScanFailure(error) {
+  // ignore scan errors; library will keep scanning
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  const qrRegionId = "qr-reader";
+  
+  // Mobile security/HTTPS check
+  if (!window.isSecureContext && window.location.hostname !== "localhost") {
+    const readerDiv = document.getElementById(qrRegionId);
+    if (readerDiv) {
+      readerDiv.innerHTML = `
+        <div class="alert alert-warning">
+          <h5 class="alert-heading">⚠️ HTTPS Required for Mobile</h5>
+          <p class="small mb-0">Browsers block camera access on mobile unless you use <strong>HTTPS</strong>. 
+          To test on mobile, use a secure tunnel like <a href="https://ngrok.com" target="_blank">ngrok</a> or 
+          access via localhost on your PC.</p>
+        </div>`;
+    }
+    return;
+  }
+
+  const config = {
+    fps: 15,
+    qrbox: (viewfinderWidth, viewfinderHeight) => {
+      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+      const boxSize = Math.floor(minEdge * 0.7);
+      return { width: boxSize, height: boxSize };
+    },
+    aspectRatio: 1.0,
+    videoConstraints: {
+      facingMode: "environment"
+    }
+  };
+
+  if (document.getElementById(qrRegionId)) {
+    const html5QrcodeScanner = new Html5QrcodeScanner(qrRegionId, config, false);
+    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+  }
+});
+</script>
+{% endblock %}
+

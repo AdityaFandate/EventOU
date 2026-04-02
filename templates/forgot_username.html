@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Forgot Username | Smart Event Crowd Management{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5 reveal">
+  <div class="col-md-6 col-lg-5">
+    <div class="card shadow-sm border-0">
+      <div class="card-body p-4 p-lg-5">
+        <h1 class="h4 mb-2 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Forgot Username</h1>
+        <p class="small text-muted mb-4">
+          Enter your registered Name and Roll Number to retrieve your email address.
+        </p>
+
+        <form method="post" action="{{ url_for('forgot_username') }}" class="vstack gap-3">
+          <div class="form-floating">
+            <input
+              type="text"
+              class="form-control"
+              id="name"
+              name="name"
+              placeholder=" "
+              required
+            />
+            <label for="name">Full Name</label>
+          </div>
+
+          <div class="form-floating">
+            <input
+              type="text"
+              class="form-control"
+              id="roll_number"
+              name="roll_number"
+              placeholder=" "
+              required
+            />
+            <label for="roll_number">Roll Number</label>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 py-2 mt-2">
+            Retrieve Email
+          </button>
+        </form>
+
+        <p class="small text-muted mt-4 mb-0 text-center">
+          Remembered your details?
+          <a href="{{ url_for('login') }}" class="text-accent text-decoration-none fw-semibold">Back to login</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

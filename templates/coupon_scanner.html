@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Food Coupon Scanner | Smart Event Crowd Management{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-6">
+    <div class="card shadow-sm text-center">
+      <div class="card-body">
+        <h1 class="h4 mb-2">Scan Food Coupon</h1>
+        <p class="small text-muted mb-3">
+          Point the camera at a student's food coupon QR. The system will open the coupon verification page.
+        </p>
+
+        <div id="reader" style="width:400px; margin-inline:auto;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script>
+  function onScanSuccess(decodedText /*, decodedResult */) {
+    window.location.href = "/verify_coupon/" + decodedText;
+  }
+
+  // Mobile security/HTTPS check
+  if (!window.isSecureContext && window.location.hostname !== "localhost") {
+    const readerDiv = document.getElementById("reader");
+    if (readerDiv) {
+      readerDiv.innerHTML = `
+        <div class="alert alert-warning">
+          <h5 class="alert-heading">⚠️ HTTPS Required for Mobile</h5>
+          <p class="small mb-0">Browsers block camera access on mobile unless you use <strong>HTTPS</strong>. 
+          To test on mobile, use a secure tunnel like <a href="https://ngrok.com" target="_blank">ngrok</a> or 
+          access via localhost on your PC.</p>
+        </div>`;
+    }
+  } else {
+    const config = {
+      fps: 15,
+      qrbox: (viewfinderWidth, viewfinderHeight) => {
+        const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+        const boxSize = Math.floor(minEdge * 0.7);
+        return { width: boxSize, height: boxSize };
+      },
+      aspectRatio: 1.0,
+      videoConstraints: {
+        facingMode: "environment"
+      }
+    };
+
+    const scanner = new Html5QrcodeScanner("reader", config, false);
+    scanner.render(onScanSuccess);
+  }
+</script>
+{% endblock %}
+

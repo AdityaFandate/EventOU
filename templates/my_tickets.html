@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}My Tickets & Vouchers - Smart Crowd Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="h2 fw-bold text-white mb-1">My Dashboard</h1>
+        <p class="text-muted">Manage your event passes and food vouchers.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header p-0 border-0">
+                <ul class="nav nav-tabs nav-fill" id="myTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active py-3 fw-bold" id="tickets-tab" data-bs-toggle="tab" data-bs-target="#tickets" type="button" role="tab" aria-controls="tickets" aria-selected="true">
+                            <i class="bi bi-ticket-perforated me-2"></i>Event Passes
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link py-3 fw-bold" id="coupons-tab" data-bs-toggle="tab" data-bs-target="#coupons" type="button" role="tab" aria-controls="coupons" aria-selected="false">
+                            <i class="bi bi-cup-hot me-2"></i>Food Vouchers
+                        </button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body p-4">
+                <div class="tab-content" id="myTabContent">
+                    <!-- Event Passes Tab -->
+                    <div class="tab-pane fade show active" id="tickets" role="tabpanel" aria-labelledby="tickets-tab">
+                        {% if tickets %}
+                        <div class="row g-4">
+                            {% for ticket in tickets %}
+                            <div class="col-md-6 col-lg-4">
+                                <div class="card h-100 overflow-hidden" style="border-left: 4px solid var(--accent); background: rgba(124,92,252,0.03);">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start mb-3">
+                                            <div>
+                                                {% if ticket.event.end_time < now %}
+                                                <span class="badge status-blocked">
+                                                    Expired
+                                                </span>
+                                                {% else %}
+                                                <span class="badge {% if ticket.paid %}status-normal{% else %}status-warning{% endif %}">
+                                                    {{ 'Active Pass' if ticket.paid else 'Pending Payment' }}
+                                                </span>
+                                                {% endif %}
+                                                <span class="text-muted small ms-2">ID: #{{ ticket.id }}</span>
+                                            </div>
+                                            <small class="text-muted">{{ ticket.created_at.strftime('%b %d') }}</small>
+                                        </div>
+                                        <h5 class="card-title fw-bold mb-1">{{ ticket.event.name }}</h5>
+                                        <div class="mb-2">
+                                            <span class="text-white small fw-bold">
+                                                <i class="bi bi-person-badge me-1"></i>Member: {{ ticket.guest_name if ticket.guest_name else current_user.name }}
+                                            </span>
+                                        </div>
+                                        {% if ticket.team_name %}
+                                        <p class="text-accent small fw-bold mb-1" style="color: var(--accent2);">
+                                            <i class="bi bi-people-fill me-1"></i>Team: {{ ticket.team_name }}
+                                        </p>
+                                        {% endif %}
+                                        <p class="text-muted small mb-3">
+                                            <i class="bi bi-geo-alt me-1"></i>{{ ticket.event.location }}
+                                        </p>
+                                        
+                                        <div class="d-flex align-items-center gap-2 mb-4">
+                                            <div class="bg-surface rounded p-2 text-center flex-fill">
+                                                <small class="text-muted d-block text-uppercase" style="font-size: 0.65rem;">Time Slot</small>
+                                                <span class="small fw-bold">{{ ticket.time_slot.start_time.strftime('%H:%M') if ticket.time_slot else 'General' }}</span>
+                                            </div>
+                                            <div class="bg-surface rounded p-2 text-center flex-fill">
+                                                <small class="text-muted d-block text-uppercase" style="font-size: 0.65rem;">Status</small>
+                                                <span class="small fw-bold">{{ 'Checked In' if ticket.checked_in else 'Ready' }}</span>
+                                            </div>
+                                        </div>
+
+                                        {% if ticket.event.end_time < now %}
+                                        <button class="btn btn-secondary w-100" disabled>
+                                            Expired
+                                        </button>
+                                        {% elif ticket.paid %}
+                                        <a href="{{ url_for('view_pass', ticket_id=ticket.id) }}" class="btn btn-primary w-100">
+                                            View Pass
+                                        </a>
+                                        {% else %}
+                                        <a href="{{ url_for('payment_page', ticket_id=ticket.id) }}" class="btn btn-warning w-100 text-dark">
+                                            Pay Now
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5">
+                            <div class="mb-3">
+                                <i class="bi bi-ticket-perforated text-muted" style="font-size: 3rem;"></i>
+                            </div>
+                            <h5 class="text-muted">No passes found</h5>
+                            <a href="{{ url_for('event_listing') }}" class="btn btn-outline-primary mt-3">Browse Events</a>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Food Vouchers Tab -->
+                    <div class="tab-pane fade" id="coupons" role="tabpanel" aria-labelledby="coupons-tab">
+                        {% if coupons %}
+                        <div class="row g-4">
+                            {% for coupon in coupons %}
+                            <div class="col-md-6 col-lg-4">
+                                <div class="card h-100 overflow-hidden" style="border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.05);">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start mb-3">
+                                            <span class="badge {% if coupon.used %}status-blocked{% else %}status-warning{% endif %}" style="{% if not coupon.used %}background: rgba(245, 158, 11, 0.1) !important; color: #f59e0b !important; border-color: rgba(245, 158, 11, 0.3);{% endif %}">
+                                                {{ 'Used' if coupon.used else 'Available' }}
+                                            </span>
+                                            <small class="text-muted">{{ coupon.created_at.strftime('%b %d') }}</small>
+                                        </div>
+                                        <h5 class="card-title fw-bold mb-1">{{ coupon.coupon_name }}</h5>
+                                        <p class="text-muted small mb-1">
+                                            <i class="bi bi-calendar-event me-1"></i>{{ coupon.event.name if coupon.event else 'General' }}
+                                        </p>
+                                        <div class="p-2 rounded mb-4" style="background: rgba(245, 158, 11, 0.1); border: 1px dashed rgba(245, 158, 11, 0.3);">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span class="text-white small fw-bold">{{ coupon.food_item }}</span>
+                                                <span class="badge bg-dark text-white">x{{ coupon.quantity }}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <a href="{{ url_for('view_coupon', coupon_id=coupon.id) }}" class="btn btn-outline-warning w-100" style="border-color: #f59e0b; color: #f59e0b !important;">
+                                            Open Voucher
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5">
+                            <div class="mb-3">
+                                <i class="bi bi-cup-hot text-muted" style="font-size: 3rem;"></i>
+                            </div>
+                            <h5 class="text-muted">No food vouchers found</h5>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .nav-tabs {
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+    }
+    .nav-tabs .nav-link {
+        color: var(--muted) !important;
+        border: none;
+        border-radius: 0;
+        transition: all 0.3s;
+        border-bottom: 2px solid transparent;
+    }
+    .nav-tabs .nav-link:hover {
+        background: rgba(255,255,255,0.03);
+        color: var(--text) !important;
+    }
+    .nav-tabs .nav-link.active {
+        background: transparent !important;
+        color: var(--accent2) !important;
+        border-bottom: 2px solid var(--accent2);
+    }
+    .bg-surface {
+        background: var(--surface);
+    }
+</style>
+{% endblock %}

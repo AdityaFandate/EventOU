@@ -1,0 +1,630 @@
+{% extends "base.html" %}
+
+{% block title %}{{ event.name }} | Smart Event Crowd Management{% endblock %}
+
+{% block content %}
+<div class="mb-3 page-header reveal">
+  <a href="{{ url_for('index') }}" class="btn btn-link ps-0 text-accent text-decoration-none" style="color: var(--accent);">&larr; Back to dashboard</a>
+</div>
+
+{% if announcements %}
+<div class="alert alert-info mb-4 border-0 reveal reveal-delay-1" style="background: rgba(56,189,248,0.1); color: #38bdf8;">
+  <h5 class="alert-heading fw-bold" style="font-family: 'Syne', sans-serif;">📢 Event Announcements</h5>
+  {% for announcement in announcements %}
+  <div class="mb-2">
+    <strong class="text-white">{{ announcement.title }}</strong><br>
+    <small>{{ announcement.message }}</small>
+  </div>
+  {% if not loop.last %}<hr style="opacity: 0.1;">{% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="row g-4 reveal reveal-delay-1">
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        {% if event.poster_filename %}
+        {% set ext = event.poster_filename.rsplit('.', 1)[-1] | lower %}
+        <div class="mb-3">
+          {% if ext in ['mp4', 'webm'] %}
+          <video
+            class="img-fluid rounded-4"
+            autoplay
+            muted
+            loop
+            playsinline
+            controls
+          >
+            <source src="{{ url_for('static', filename='event_posters/' ~ event.poster_filename) }}" type="video/{{ ext }}">
+            Your browser does not support the video tag.
+          </video>
+          {% else %}
+          <img
+            src="{{ url_for('static', filename='event_posters/' ~ event.poster_filename) }}"
+            alt="Poster for {{ event.name }}"
+            class="img-fluid rounded-4"
+          />
+          {% endif %}
+        </div>
+        {% endif %}
+        <h1 class="h4 mb-1 fw-bold text-white" style="font-family: 'Syne', sans-serif;">{{ event.name }}</h1>
+        <p class="text-muted mb-3">{{ event.location }}</p>
+        <span class="badge bg-secondary mb-3">{{ event.event_type|capitalize }}</span>
+        <span class="badge {% if event.is_paid %}bg-warning text-dark{% else %}bg-success{% endif %} mb-3">
+          {% if event.is_paid %}₹{{ "%.2f"|format(event.price) }}{% else %}Free Event{% endif %}
+        </span>
+
+        <dl class="row small mb-3">
+          <dt class="col-4 text-muted">Schedule</dt>
+          <dd class="col-8 text-white">
+            {{ event.start_time.strftime('%d %b %Y, %H:%M') }}
+            –
+            {{ event.end_time.strftime('%d %b %Y, %H:%M') }}
+          </dd>
+
+          <dt class="col-4 text-muted">Capacity</dt>
+          <dd class="col-8 text-white">
+            {{ event.max_capacity }} people
+          </dd>
+
+          <dt class="col-4 text-muted">Thresholds</dt>
+          <dd class="col-8 text-muted">
+            Safe &lt; {{ (event.safe_threshold * 100) | round(0) | int }}%,
+            Warning &lt; {{ (event.warning_threshold * 100) | round(0) | int }}%
+          </dd>
+        </dl>
+
+        <div class="border-top border-secondary pt-3 mt-3">
+          <h2 class="h6 mb-2 fw-semibold text-white">Live status</h2>
+          <div id="status-chip" class="status-chip status-{{ event.status }}">
+            <span class="dot"></span>
+            <span id="status-label">{{ event.status|capitalize }}</span>
+          </div>
+          <p id="status-message" class="small text-muted mt-2 mb-0">
+            {{ event.status_message }}
+          </p>
+          {% if event.entry_blocked %}
+          <div class="alert alert-warning alert-sm py-2 mt-2 mb-0 border-0" style="background: rgba(251,191,36,0.1); color: #fbbf24;">
+            <small><strong>Entry is currently blocked</strong></small>
+          </div>
+          {% endif %}
+        </div>
+
+        {% if current_user.is_authenticated and current_user.role in ['admin', 'faculty_coordinator'] %}
+        <div class="border-top border-secondary pt-3 mt-3">
+          <h2 class="h6 mb-2 fw-semibold text-white">Admin Controls</h2>
+          {% if event.entry_blocked %}
+          <form method="post" action="{{ url_for('unblock_event_entry', event_id=event.id) }}" class="d-inline">
+            <button type="submit" class="btn btn-sm btn-success w-100">Unblock Entry</button>
+          </form>
+          {% else %}
+          <form method="post" action="{{ url_for('block_event_entry', event_id=event.id) }}" class="d-inline">
+            <button type="submit" class="btn btn-sm btn-warning w-100">Block Entry</button>
+          </form>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% if current_user.is_authenticated and current_user.role in ['admin', 'faculty_coordinator', 'host'] %}
+        <div class="border-top border-secondary pt-3 mt-3">
+          <h2 class="h6 mb-2 fw-semibold text-white">Event Poster</h2>
+          <form
+            method="post"
+            action="{{ url_for('upload_event_poster', event_id=event.id) }}"
+            enctype="multipart/form-data"
+            class="vstack gap-2"
+          >
+            <input
+              type="file"
+              name="poster"
+              accept="image/*"
+              class="form-control form-control-sm"
+              required
+            />
+            <button type="submit" class="btn btn-sm btn-outline-primary">
+              Upload / Update Poster
+            </button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body d-flex flex-column">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h2 class="h5 mb-0 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Crowd control panel</h2>
+          <span class="badge bg-surface text-muted small border border-secondary">
+            Event ID: {{ event.id }}
+          </span>
+        </div>
+
+        <div class="row align-items-center g-3 mb-4">
+          <div class="col-md-5">
+            <div class="display-5 fw-bold text-white" id="current-count" style="font-family: 'Syne', sans-serif;">
+              {{ event.current_count }}
+            </div>
+            <div class="text-muted small">
+              of {{ event.max_capacity }} (
+              <span id="occupancy-percent" class="text-accent fw-bold" style="color: var(--accent);">
+                {{ (event.occupancy_ratio * 100) | round(0) | int }}
+              </span>% )
+            </div>
+          </div>
+          <div class="col-md-7">
+            <div class="progress" style="height: 12px;">
+              <div
+                id="occupancy-bar"
+                class="progress-bar status-{{ event.status }}"
+                role="progressbar"
+                aria-valuenow="{{ (event.occupancy_ratio * 100) | round(0) | int }}"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                style="width: {{ (event.occupancy_ratio * 100) | round(0) | int }}%;"
+              ></div>
+          
+            </div>
+            <div class="d-flex justify-content-between text-muted small mt-2">
+              <span>0%</span>
+              <span>100%</span>
+            </div>
+          </div>
+        </div>
+
+        {% if current_user.is_authenticated and current_user.role in ['admin', 'faculty_coordinator', 'host'] %}
+        <div class="row g-3 mb-4">
+          <div class="col-md-6 d-grid">
+            <button
+              id="btn-entry"
+              class="btn btn-primary btn-lg fw-bold"
+              style="background: #22c55e;"
+              data-delta="1"
+              type="button"
+            >
+              + Entry
+            </button>
+          </div>
+          <div class="col-md-6 d-grid">
+            <button
+              id="btn-exit"
+              class="btn btn-outline-secondary btn-lg fw-bold"
+              data-delta="-1"
+              type="button"
+            >
+              - Exit
+            </button>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="mt-4 vstack gap-3">
+          {% if current_user.is_authenticated and current_user.role in ['admin', 'host', 'faculty_coordinator'] %}
+          <div class="d-flex gap-2">
+            <a href="{{ url_for('edit_event', event_id=event.id) }}" class="btn btn-outline-warning flex-grow-1 py-2">
+              <i class="bi bi-pencil me-2"></i>Edit Event
+            </a>
+          </div>
+          {% endif %}
+          
+          {% if current_user.is_authenticated and current_user.role == 'student' %}
+            {% if user_tickets %}
+              <div class="col-12">
+                <div class="card border-0 mb-3" style="background: rgba(124,92,252,0.05); border: 1px solid rgba(124,92,252,0.2) !important; border-radius: 20px;">
+                  <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                      <h4 class="h6 mb-0 text-white fw-bold">Your Registrations</h4>
+                      <span class="badge rounded-pill bg-primary" style="font-size: 0.7rem;">{{ user_tickets|length }} / 4 Passes</span>
+                    </div>
+                    
+                    <div class="vstack gap-2">
+                      {% for ticket in user_tickets %}
+                      <div class="d-flex justify-content-between align-items-center p-3 rounded-4 bg-surface border border-secondary border-opacity-10">
+                        <div>
+                          <div class="text-white fw-semibold small">Pass #{{ loop.index }}</div>
+                          <div class="text-muted" style="font-size: 0.65rem;">ID: #{{ ticket.id }}</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                          {% if not ticket.paid %}
+                          <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25" style="font-size: 0.6rem;">UNPAID</span>
+                          {% else %}
+                          <span class="badge bg-success-subtle text-success border border-success border-opacity-25" style="font-size: 0.6rem;">ACTIVE</span>
+                          {% endif %}
+                          <a href="{{ url_for('view_pass', ticket_id=ticket.id) }}" class="btn btn-sm btn-primary px-3 py-1" style="font-size: 0.75rem;">View</a>
+                        </div>
+                      </div>
+                      {% endfor %}
+                    </div>
+                    
+                    {% if user_tickets|length < 4 %}
+                    <div class="mt-4 p-3 rounded-4 border border-dashed border-secondary border-opacity-25 text-center">
+                      <p class="small text-muted mb-2">Need more entries? You can get up to 4 passes.</p>
+                      <button class="btn btn-sm btn-outline-primary px-4" type="button" onclick="document.getElementById('registration-form').scrollIntoView({behavior: 'smooth'})">
+                        Request Another Pass
+                      </button>
+                    </div>
+                    {% endif %}
+                  </div>
+                </div>
+
+                {% if coupons %}
+                <div class="mt-4">
+                  <h3 class="h6 mb-3 fw-bold text-white" style="font-family: 'Syne', sans-serif;">🍔 Your Food Vouchers</h3>
+                  <div class="row g-3">
+                    {% for coupon in coupons %}
+                    <div class="col-12">
+                      <div class="card border-0 overflow-hidden" style="background: #1a1a2e; border: 1px solid rgba(245,158,11,0.2) !important; border-radius: 16px;">
+                        <div class="card-body p-0">
+                          <div class="px-3 py-2 d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                            <span class="small fw-bold text-white" style="font-size: 0.7rem;">{{ coupon.coupon_name }}</span>
+                            {% if coupon.used %}
+                            <span class="badge bg-white text-success fw-bold" style="font-size: 0.55rem;">REDEEMED</span>
+                            {% else %}
+                            <span class="badge bg-white text-warning fw-bold" style="font-size: 0.55rem;">VALID</span>
+                            {% endif %}
+                          </div>
+                          <div class="p-3">
+                            <div class="row align-items-center">
+                              <div class="col-12">
+                                <span class="small text-muted d-block text-uppercase" style="font-size: 0.55rem;">Item</span>
+                                <span class="fw-bold text-white d-block mb-1" style="font-size: 0.85rem;">{{ coupon.food_item }}</span>
+                                <span class="small text-muted" style="font-size: 0.65rem;">Qty: {{ coupon.quantity }}x</span>
+                                {% if not coupon.used %}
+                                <div class="mt-2">
+                                  <a href="{{ url_for('view_coupon', coupon_id=coupon.id) }}" class="btn btn-sm btn-warning w-100 py-1 fw-bold" style="font-size: 0.65rem;">Open Voucher</a>
+                                </div>
+                                {% endif %}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {% endfor %}
+                  </div>
+                </div>
+                {% endif %}
+              </div>
+            {% endif %}
+
+<style>
+  .quantity-selector {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 20px 0;
+  }
+  .quantity-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: bold;
+  }
+  .quantity-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .quantity-btn.active {
+    background: #f3475e;
+    border-color: #f3475e;
+    color: white;
+    box-shadow: 0 4px 12px rgba(243, 71, 94, 0.3);
+  }
+  .quantity-btn.disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .seat-type-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 15px;
+    text-align: center;
+    flex: 1;
+  }
+  .price-tag {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: var(--text);
+    margin: 5px 0;
+  }
+  .availability-tag {
+    font-size: 0.7rem;
+    font-weight: bold;
+    color: #4cd964;
+    text-transform: uppercase;
+  }
+</style>
+
+<div class="card border-0 shadow-lg reveal overflow-hidden" style="border-radius: 24px; background: var(--card);">
+  <div class="card-body p-0">
+    <div class="p-4 text-center border-bottom border-secondary border-opacity-10">
+      <h2 class="h4 mb-3 fw-bold text-white" style="font-family: 'Syne', sans-serif;">
+        {% if event.is_group_event %}Group Registration{% else %}How many passes?{% endif %}
+      </h2>
+      
+      <!-- Illustration placeholder -->
+      <div class="mb-4">
+        <img src="https://img.freepik.com/free-vector/scooter-concept-illustration_114360-11814.jpg" alt="Booking" style="width: 120px; filter: hue-rotate(320deg);">
+      </div>
+
+      {% set max_allowed = event.group_size if event.is_group_event else 4 %}
+      {% set remaining_limit = max_allowed - user_tickets|length %}
+      
+      <div class="quantity-selector" id="pass-quantity-selector">
+        {% for i in range(1, max_allowed + 1) %}
+          <button type="button" 
+                  class="quantity-btn {% if i == 1 %}active{% endif %} {% if i > remaining_limit %}disabled{% endif %}" 
+                  data-val="{{ i }}">
+            {{ i }}
+          </button>
+        {% endfor %}
+      </div>
+      {% if event.is_group_event %}
+      <p class="small text-muted mt-2">Max members allowed: {{ event.group_size }}</p>
+      {% endif %}
+    </div>
+
+    <div class="p-4">
+      <div class="d-flex gap-3 mb-4">
+        <div class="seat-type-card">
+          <div class="small text-muted text-uppercase fw-bold" style="font-size: 0.6rem; letter-spacing: 1px;">Standard</div>
+          <div class="price-tag">{% if event.is_paid %}₹{{ "%.0f"|format(event.price) }}{% else %}Free{% endif %}</div>
+          <div class="availability-tag">Available</div>
+        </div>
+      </div>
+
+      <form method="post" action="{{ url_for('create_ticket', event_id=event.id) }}" id="registration-form">
+        <input type="hidden" name="quantity" id="selected-quantity" value="1">
+        
+        {% if event.is_group_event %}
+        <div class="mb-3">
+          <label class="form-label small text-muted text-uppercase fw-bold" style="font-size: 0.6rem;">Team Name</label>
+          <input type="text" class="form-control bg-surface border-secondary border-opacity-25 text-white" 
+                 name="team_name" placeholder="Enter your team name" required>
+        </div>
+        <div id="member-names-container">
+          <div class="mb-3">
+            <label class="form-label small text-muted text-uppercase fw-bold" style="font-size: 0.6rem;">Member 1 (Leader)</label>
+            <input type="text" class="form-control bg-surface border-secondary border-opacity-25 text-white" 
+                   name="member_names[]" placeholder="Enter Member 1 name" value="{{ current_user.name }}" required>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small text-muted text-uppercase fw-bold" style="font-size: 0.6rem;">Team Details (Roll Numbers, etc.)</label>
+          <textarea class="form-control bg-surface border-secondary border-opacity-25 text-white" 
+                    name="member_details" rows="3" placeholder="Additional details for the whole team" required></textarea>
+        </div>
+        {% endif %}
+
+        {% if time_slots %}
+        <div class="mb-3">
+          <label class="form-label small text-muted text-uppercase fw-bold" style="font-size: 0.6rem;">Select Time Slot</label>
+          <select class="form-select bg-surface border-secondary border-opacity-25" name="time_slot_id" required>
+            {% for slot in time_slots %}
+            <option value="{{ slot.id }}" {% if slot.is_full %}disabled{% endif %}>
+              {{ slot.start_time.strftime('%H:%M') }} - {{ slot.end_time.strftime('%H:%M') }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+
+        <button type="submit" class="btn w-100 py-3 fw-bold text-white" 
+                style="background: #f3475e; border-radius: 12px; font-size: 1.1rem;"
+                {% if remaining_limit <= 0 or event.entry_blocked %}disabled{% endif %}>
+          {% if remaining_limit <= 0 %}
+            Limit Reached
+          {% else %}
+            Select Passes
+          {% endif %}
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const quantityBtns = document.querySelectorAll('.quantity-btn');
+  const quantityInput = document.getElementById('selected-quantity');
+
+  quantityBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      if (this.classList.contains('disabled')) return;
+      
+      quantityBtns.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      const val = parseInt(this.dataset.val);
+      quantityInput.value = val;
+      
+      // Update dynamic member name fields for group events
+      const container = document.getElementById('member-names-container');
+      if (container) {
+        // Keep the leader (Member 1) and regenerate others
+        const leaderField = container.firstElementChild;
+        container.innerHTML = '';
+        container.appendChild(leaderField);
+        
+        for (let i = 2; i <= val; i++) {
+          const div = document.createElement('div');
+          div.className = 'mb-3';
+          div.innerHTML = `
+            <label class="form-label small text-muted text-uppercase fw-bold" style="font-size: 0.6rem;">Member ${i}</label>
+            <input type="text" class="form-control bg-surface border-secondary border-opacity-25 text-white" 
+                   name="member_names[]" placeholder="Enter Member ${i} name" required>
+          `;
+          container.appendChild(div);
+        }
+      }
+    });
+  });
+});
+</script>
+          {% elif not current_user.is_authenticated %}
+          <div class="col-12">
+            <p class="small text-muted mb-0">
+              Want to attend? <a href="{{ url_for('login') }}" class="text-accent" style="color: var(--accent);">Log in</a> or
+              <a href="{{ url_for('register') }}" class="text-accent" style="color: var(--accent);">register</a> as a student to get a QR pass.
+            </p>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="mt-auto p-3 rounded-4" style="background: rgba(255,255,255,0.03);">
+          <h3 class="h6 mb-2 fw-semibold text-white">Recommended actions</h3>
+          <ul class="small text-muted mb-0">
+            <li>Use the entry and exit buttons as people pass through gates.</li>
+            <li>
+              When status turns <span class="fw-semibold text-warning">Warning</span>,
+              coordinate with staff to slow down entry.
+            </li>
+            <li>
+              When status turns <span class="fw-semibold text-danger">Critical</span>,
+              pause entry, open additional exits, and redirect people to
+              alternative areas.
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if zones or gates or current_user.is_authenticated and current_user.role in ['admin', 'faculty_coordinator'] %}
+<div class="row g-4 mt-2 reveal reveal-delay-2">
+  {% if zones %}
+  <div class="col-md-6">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h2 class="h5 mb-3 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Zone Monitoring</h2>
+        {% for zone in zones %}
+        <div class="mb-3">
+          <div class="d-flex justify-content-between small mb-1">
+            <span class="text-white">{{ zone.name }}</span>
+            <span class="text-muted">{{ zone.current_count }} / {{ zone.max_capacity }}</span>
+          </div>
+          <div class="progress" style="height: 6px;">
+            <div class="progress-bar status-{{ 'critical' if zone.occupancy_ratio >= 0.9 else 'warning' if zone.occupancy_ratio >= 0.7 else 'normal' }}" 
+                 style="width: {{ (zone.occupancy_ratio * 100) | round(0) | int }}%;"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if gates %}
+  <div class="col-md-6">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h2 class="h5 mb-3 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Gate Statistics</h2>
+        {% for gate in gates %}
+        <div class="mb-2 small border-bottom border-secondary pb-2 mb-2">
+          <strong class="text-white">{{ gate.name }}</strong><br>
+          <span class="text-muted">Entries: <span class="text-success">{{ gate.entry_count }}</span> | Exits: <span class="text-warning">{{ gate.exit_count }}</span> | Net: <span class="text-info fw-bold">{{ gate.net_count }}</span></span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if current_user.is_authenticated and current_user.role in ['admin', 'faculty_coordinator'] %}
+<div class="row g-4 mt-2 reveal reveal-delay-3">
+  <div class="col-md-4">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h2 class="h5 mb-3 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Add Zone</h2>
+        <form method="post" action="{{ url_for('create_zone', event_id=event.id) }}">
+          <div class="mb-2">
+            <input type="text" class="form-control form-control-sm" name="name" placeholder="Zone name" required>
+          </div>
+          <div class="mb-2">
+            <input type="number" class="form-control form-control-sm" name="max_capacity" placeholder="Max capacity" required>
+          </div>
+          <button type="submit" class="btn btn-sm btn-primary w-100">Create Zone</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h2 class="h5 mb-3 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Add Gate</h2>
+        <form method="post" action="{{ url_for('create_gate', event_id=event.id) }}">
+          <div class="mb-2">
+            <input type="text" class="form-control form-control-sm" name="name" placeholder="Gate name" required>
+          </div>
+          <button type="submit" class="btn btn-sm btn-primary w-100">Create Gate</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h2 class="h5 mb-3 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Add Time Slot</h2>
+        <form method="post" action="{{ url_for('create_time_slot', event_id=event.id) }}">
+          <div class="mb-2">
+            <input type="datetime-local" class="form-control form-control-sm" name="start_time" required>
+          </div>
+          <div class="mb-2">
+            <input type="datetime-local" class="form-control form-control-sm" name="end_time" required>
+          </div>
+          <div class="mb-2">
+            <input type="number" class="form-control form-control-sm" name="max_participants" placeholder="Max participants" required>
+          </div>
+          <button type="submit" class="btn btn-sm btn-primary w-100">Create Time Slot</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mt-4 reveal reveal-delay-4">
+  <div class="col-12">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h2 class="h5 mb-3 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Create Announcement</h2>
+        <form method="post" action="{{ url_for('create_announcement') }}">
+          <input type="hidden" name="event_id" value="{{ event.id }}">
+          <div class="mb-3">
+            <input type="text" class="form-control" name="title" placeholder="Announcement title" required>
+          </div>
+          <div class="mb-3">
+            <textarea class="form-control" name="message" rows="3" placeholder="Message" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm px-4">Post Announcement</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+window.CROWD_EVENT_ID = {{ event.id | tojson }};
+
+</script>
+<script src="{{ url_for('static', filename='js/crowd.js') }}"></script>
+{% endblock %}

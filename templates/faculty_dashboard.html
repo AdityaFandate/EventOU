@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Faculty Coordinator Dashboard | Smart Event Crowd Management{% endblock %}
+
+{% block content %}
+<div class="mb-4 page-header d-flex justify-content-between align-items-center reveal">
+  <div>
+    <h1 class="h3 mb-1 fw-bold" style="font-family: 'Syne', sans-serif;">Faculty Coordinator Dashboard</h1>
+    <p class="text-muted mb-0">Monitor crowd levels and receive alerts</p>
+  </div>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createEventModal">Create New Event</button>
+</div>
+
+<!-- Create Event Modal -->
+<div class="modal fade" id="createEventModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Create New Event</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{{ url_for('create_event') }}">
+        <div class="modal-body vstack gap-3">
+          <div class="form-floating">
+            <input type="text" class="form-control" id="name" name="name" placeholder=" " required />
+            <label for="name">Event Name</label>
+          </div>
+          <div class="form-floating">
+            <input type="text" class="form-control" id="location" name="location" placeholder=" " required />
+            <label for="location">Location</label>
+          </div>
+          <div class="row g-2">
+            <div class="col">
+              <div class="form-floating">
+                <input type="datetime-local" class="form-control" id="start_time" name="start_time" placeholder=" " required />
+                <label for="start_time">Start Time</label>
+              </div>
+            </div>
+            <div class="col">
+              <div class="form-floating">
+                <input type="datetime-local" class="form-control" id="end_time" name="end_time" placeholder=" " required />
+                <label for="end_time">End Time</label>
+              </div>
+            </div>
+          </div>
+          <div class="form-floating">
+            <select class="form-select" id="event_type" name="event_type" placeholder=" ">
+              <option value="general">General Event</option>
+              <option value="cultural">Cultural Fest</option>
+              <option value="technical">Technical Event</option>
+              <option value="sports">Sports Event</option>
+              <option value="seminar">Seminar/Lecture</option>
+              <option value="convocation">Convocation</option>
+            </select>
+            <label for="event_type">Event Type</label>
+          </div>
+          <div class="row g-2">
+            <div class="col">
+              <div class="form-floating">
+                <input type="number" class="form-control" id="max_capacity" name="max_capacity" min="1" placeholder=" " required />
+                <label for="max_capacity">Capacity</label>
+              </div>
+            </div>
+            <div class="col">
+              <div class="form-floating">
+                <input type="number" class="form-control" id="safe_threshold" name="safe_threshold" value="70" min="1" max="100" placeholder=" " />
+                <label for="safe_threshold">Safe %</label>
+              </div>
+            </div>
+            <div class="col">
+              <div class="form-floating">
+                <input type="number" class="form-control" id="warning_threshold" name="warning_threshold" value="90" min="1" max="100" placeholder=" " />
+                <label for="warning_threshold">Warn %</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Event</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 reveal reveal-delay-1">
+  {% for event in events %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card shadow-sm h-100 border-0">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h3 class="h6 mb-0 fw-bold text-white" style="font-family: 'Syne', sans-serif;">{{ event.name }}</h3>
+          <span class="badge status-badge status-{{ event.status }}">
+            {{ event.status|capitalize }}
+          </span>
+        </div>
+        <p class="text-muted small mb-3">{{ event.location }}</p>
+        
+        <div class="mb-3">
+          <div class="d-flex justify-content-between small mb-1">
+            <span class="text-muted">Occupancy</span>
+            <span class="fw-semibold text-white">{{ (event.occupancy_ratio * 100) | round(0) | int }}%</span>
+          </div>
+          <div class="progress" style="height: 8px;">
+            <div class="progress-bar status-{{ event.status }}" style="width: {{ (event.occupancy_ratio * 100) | round(0) | int }}%;"></div>
+          </div>
+          <div class="small text-muted mt-2">
+            {{ event.current_count }} / {{ event.max_capacity }} people
+          </div>
+        </div>
+
+        {% if event.status == "warning" or event.status == "critical" %}
+        <div class="alert alert-warning alert-sm py-2 mb-3 border-0" style="background: rgba(251,191,36,0.1); color: #fbbf24;">
+          <small><strong>Alert:</strong> {{ event.status_message }}</small>
+        </div>
+        {% endif %}
+
+        <div class="mt-4">
+          <div class="d-flex gap-2 mb-2">
+            <a href="{{ url_for('event_detail', event_id=event.id) }}" class="btn btn-primary flex-grow-1">View Details</a>
+            <a href="{{ url_for('edit_event', event_id=event.id) }}" class="btn btn-outline-warning px-3 d-flex align-items-center justify-content-center" title="Edit Event">
+              <i class="bi bi-pencil"></i>
+            </a>
+          </div>
+          {% if event.entry_blocked %}
+          <form method="post" action="{{ url_for('unblock_event_entry', event_id=event.id) }}">
+            <button type="submit" class="btn btn-sm btn-success w-100">Unblock Entry</button>
+          </form>
+          {% else %}
+          <form method="post" action="{{ url_for('block_event_entry', event_id=event.id) }}">
+            <button type="submit" class="btn btn-sm btn-warning w-100">Block Entry</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if not events %}
+<div class="text-center py-5 reveal reveal-delay-1">
+  <p class="text-muted">No events found.</p>
+</div>
+{% endif %}
+{% endblock %}
+

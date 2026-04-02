@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Event | Smart Event Crowd Management{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5">
+  <div class="col-md-8 col-lg-6">
+    <div class="card shadow-lg border-0 reveal">
+      <div class="card-header py-4 text-center border-0" style="background: linear-gradient(135deg, var(--accent), var(--accent2));">
+        <h1 class="h3 mb-0 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Edit Event</h1>
+        <p class="text-white-50 small mb-0 mt-1">Update event details and thresholds</p>
+      </div>
+      <div class="card-body p-4 p-lg-5">
+        <form method="post" class="vstack gap-4">
+          <div class="form-floating">
+            <input
+              type="text"
+              class="form-control"
+              id="edit_event_name"
+              name="name"
+              value="{{ event.name }}"
+              placeholder=" "
+              required
+            />
+            <label for="edit_event_name">Event Name</label>
+          </div>
+
+          <div class="form-floating">
+            <input
+              type="text"
+              class="form-control"
+              id="edit_event_location"
+              name="location"
+              value="{{ event.location }}"
+              placeholder=" "
+              required
+            />
+            <label for="edit_event_location">Location</label>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="form-floating">
+                <select class="form-select" id="edit_is_paid" name="is_paid" placeholder=" " onchange="togglePrice(this, 'edit_price_field')">
+                  <option value="0" {% if not event.is_paid %}selected{% endif %}>Free</option>
+                  <option value="1" {% if event.is_paid %}selected{% endif %}>Paid</option>
+                </select>
+                <label for="edit_is_paid">Pricing</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-floating" id="edit_price_field" style="display: {{ 'block' if event.is_paid else 'none' }};">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="form-control"
+                  id="edit_price"
+                  name="price"
+                  value="{{ event.price }}"
+                  placeholder=" "
+                  {% if not event.is_paid %}disabled{% endif %}
+                />
+                <label for="edit_price">Price (₹)</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="form-floating">
+                <input
+                  type="datetime-local"
+                  class="form-control"
+                  id="edit_start_time"
+                  name="start_time"
+                  value="{{ event.start_time.strftime('%Y-%m-%dT%H:%M') }}"
+                  placeholder=" "
+                  required
+                />
+                <label for="edit_start_time">Start Time</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-floating">
+                <input
+                  type="datetime-local"
+                  class="form-control"
+                  id="edit_end_time"
+                  name="end_time"
+                  value="{{ event.end_time.strftime('%Y-%m-%dT%H:%M') }}"
+                  placeholder=" "
+                  required
+                />
+                <label for="edit_end_time">End Time</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-floating">
+            <select class="form-select" id="edit_event_type" name="event_type" placeholder=" ">
+              <option value="general" {% if event.event_type == 'general' %}selected{% endif %}>General Event</option>
+              <option value="cultural" {% if event.event_type == 'cultural' %}selected{% endif %}>Cultural Fest</option>
+              <option value="technical" {% if event.event_type == 'technical' %}selected{% endif %}>Technical Event</option>
+              <option value="sports" {% if event.event_type == 'sports' %}selected{% endif %}>Sports Event</option>
+              <option value="seminar" {% if event.event_type == 'seminar' %}selected{% endif %}>Seminar/Lecture</option>
+              <option value="convocation" {% if event.event_type == 'convocation' %}selected{% endif %}>Convocation</option>
+            </select>
+            <label for="edit_event_type">Event Type</label>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input
+                  type="number"
+                  class="form-control"
+                  id="edit_max_capacity"
+                  name="max_capacity"
+                  value="{{ event.max_capacity }}"
+                  min="1"
+                  placeholder=" "
+                  required
+                />
+                <label for="edit_max_capacity">Capacity</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input
+                  type="number"
+                  class="form-control"
+                  id="edit_safe_threshold"
+                  name="safe_threshold"
+                  value="{{ (event.safe_threshold * 100)|int }}"
+                  min="1"
+                  max="100"
+                  placeholder=" "
+                />
+                <label for="edit_safe_threshold">Safe %</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input
+                  type="number"
+                  class="form-control"
+                  id="edit_warning_threshold"
+                  name="warning_threshold"
+                  value="{{ (event.warning_threshold * 100)|int }}"
+                  min="1"
+                  max="100"
+                  placeholder=" "
+                />
+                <label for="edit_warning_threshold">Warn %</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="form-check form-switch p-3 border rounded bg-surface">
+                <input class="form-check-input ms-0 me-2" type="checkbox" id="edit_is_group_event" name="is_group_event" value="1" {% if event.is_group_event %}checked{% endif %} onchange="toggleGroupSize(this, 'edit_group_size_field')">
+                <label class="form-check-label text-white" for="edit_is_group_event">Group Event / Hackathon</label>
+              </div>
+            </div>
+            <div class="col-md-6" id="edit_group_size_field" style="display: {{ 'block' if event.is_group_event else 'none' }};">
+              <div class="form-floating">
+                <input type="number" class="form-control" id="edit_group_size" name="group_size" value="{{ event.group_size }}" min="2" placeholder=" " {% if not event.is_group_event %}disabled{% endif %}>
+                <label for="edit_group_size">Max Members per Group</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2 mt-2">
+            <button type="submit" class="btn btn-primary flex-fill">
+              Save Changes
+            </button>
+            <a href="{{ request.referrer or url_for('host_dashboard') }}" class="btn btn-outline-secondary px-4">
+              Cancel
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

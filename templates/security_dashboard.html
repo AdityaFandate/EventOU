@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Security Dashboard | Smart Event Crowd Management{% endblock %}
+
+{% block content %}
+<div class="mb-4 page-header reveal">
+  <h1 class="h3 mb-1 fw-bold" style="font-family: 'Syne', sans-serif;">Security Dashboard</h1>
+  <p class="text-muted mb-0">Monitor alerts and crowd status</p>
+</div>
+
+{% if alerts %}
+<div class="alert alert-danger mb-4 border-0 reveal reveal-delay-1" style="background: rgba(248,113,113,0.1); color: #f87171;">
+  <h5 class="alert-heading fw-bold" style="font-family: 'Syne', sans-serif;">⚠️ Active Alerts</h5>
+  <ul class="mb-0">
+    {% for event in alerts %}
+    <li><strong>{{ event.name }}</strong> - {{ event.status_message }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="row g-4 reveal reveal-delay-1">
+  {% for event in events %}
+  <div class="col-md-6">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h3 class="h6 mb-0 fw-bold text-white" style="font-family: 'Syne', sans-serif;">{{ event.name }}</h3>
+          <span class="badge status-badge status-{{ event.status }}">
+            {{ event.status|capitalize }}
+          </span>
+        </div>
+        <p class="text-muted small mb-3">{{ event.location }}</p>
+        
+        <div class="mb-3" data-event-id="{{ event.id }}">
+          <div class="d-flex justify-content-between small mb-1">
+            <span class="text-muted">Current Occupancy</span>
+            <span class="fw-semibold text-white event-occupancy-percent">{{ (event.occupancy_ratio * 100) | round(0) | int }}%</span>
+          </div>
+          <div class="progress" style="height: 10px;">
+            <div class="progress-bar status-{{ event.status }} event-occupancy-bar" style="width: {{ (event.occupancy_ratio * 100) | round(0) | int }}%;"></div>
+          </div>
+          <div class="small text-muted mt-2">
+            <span class="event-current-count text-white">{{ event.current_count }}</span> /
+            <span class="event-max-capacity">{{ event.max_capacity }}</span> people
+          </div>
+        </div>
+
+        <div class="small">
+          <strong class="text-muted">Status:</strong> <span class="event-status-message text-white">{{ event.status_message }}</span>
+        </div>
+
+        {% if event.entry_blocked %}
+        <div class="alert alert-info alert-sm py-2 mt-3 mb-0 border-0" style="background: rgba(56,189,248,0.1); color: #38bdf8;">
+          <small><strong>Note:</strong> Entry is currently blocked</small>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if not events %}
+<div class="text-center py-5 reveal reveal-delay-1">
+  <p class="text-muted">No events found.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Periodically refresh security event cards so crowd counts track scanner activity
+  function refreshSecurityEvents() {
+    document.querySelectorAll('[data-event-id]').forEach(function (card) {
+      const eventId = card.getAttribute('data-event-id');
+      fetch(`/api/events/${eventId}`)
+        .then(res => res.json())
+        .then(data => {
+          const percent = data.occupancy_percent;
+          const current = data.current_count;
+          const maxCap = data.max_capacity;
+          const status = data.status;
+          const statusMessage = data.status_message;
+
+          const percentEl = card.querySelector('.event-occupancy-percent');
+          const barEl = card.querySelector('.event-occupancy-bar');
+          const currentEl = card.querySelector('.event-current-count');
+          const maxEl = card.querySelector('.event-max-capacity');
+          const statusMsgEl = card.querySelector('.event-status-message');
+          const badgeEl = card.closest('.card-body').querySelector('.status-badge');
+
+          if (percentEl) percentEl.textContent = `${percent}%`;
+          if (barEl) {
+            barEl.style.width = `${percent}%`;
+            barEl.className = `progress-bar status-${status} event-occupancy-bar`;
+          }
+          if (currentEl) currentEl.textContent = current;
+          if (maxEl) maxEl.textContent = maxCap;
+          if (statusMsgEl) statusMsgEl.textContent = statusMessage;
+          if (badgeEl) {
+            badgeEl.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+            badgeEl.className = `badge status-badge status-${status}`;
+          }
+        })
+        .catch(() => {
+          // ignore errors in periodic refresh
+        });
+    });
+  }
+
+  // Refresh every 5 seconds
+  setInterval(refreshSecurityEvents, 5000);
+</script>
+{% endblock %}

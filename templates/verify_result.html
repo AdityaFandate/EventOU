@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}QR Verification | Smart Event Crowd Management{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-6">
+    <div class="card shadow-sm text-center">
+      <div class="card-body">
+        {% if status == 'ok' and ticket %}
+        <h1 class="h4 mb-2 text-success">✓ Pass Verified</h1>
+        <p class="small text-muted mb-3">
+          {{ message or 'The QR code is valid. Entry recorded for this attendee.' }}
+        </p>
+
+        <h2 class="h5 mb-1">{{ ticket.event.name }}</h2>
+        <p class="small text-muted mb-3">
+          {{ ticket.event.location }}<br />
+          {{ ticket.event.start_time.strftime('%d %b %Y, %H:%M') }}
+        </p>
+
+        <p class="small mb-1">
+          Name: <strong>{{ ticket.student.name }}</strong>
+        </p>
+        <p class="small mb-0">
+          Ticket ID: {{ ticket.id }} · Checked in: {{ 'Yes' if ticket.checked_in else 'No' }}
+        </p>
+        {% elif status == 'invalid' %}
+        <h1 class="h4 mb-2 text-danger">✗ Invalid Pass</h1>
+        <p class="small text-muted mb-0">
+          {{ message or 'The QR code could not be verified. Please contact event staff.' }}
+        </p>
+        {% elif status == 'blocked' %}
+        <h1 class="h4 mb-2 text-warning">⚠ Entry Blocked</h1>
+        <p class="small text-muted mb-0">
+          {{ message or 'Entry is currently blocked for this event. Please contact event staff.' }}
+        </p>
+        {% elif status == 'already_used' %}
+        <h1 class="h4 mb-2 text-warning">⚠ Already Used</h1>
+        <p class="small text-muted mb-0">
+          {{ message or 'This pass has already been used. Each pass can only be used once.' }}
+        </p>
+        {% elif status == 'early' %}
+        <h1 class="h4 mb-2 text-info">⏰ Too Early</h1>
+        <p class="small text-muted mb-0">
+          {{ message or 'Your time slot has not started yet.' }}
+        </p>
+        {% elif status == 'expired' %}
+        <h1 class="h4 mb-2 text-danger">⏰ Time Slot Expired</h1>
+        <p class="small text-muted mb-0">
+          {{ message or 'Your time slot has expired.' }}
+        </p>
+        {% else %}
+        <h1 class="h4 mb-2 text-danger">✗ Verification Failed</h1>
+        <p class="small text-muted mb-0">
+          {{ message or 'The QR code could not be verified. Please contact event staff.' }}
+        </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+

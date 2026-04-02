@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Smart Event Crowd Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 page-header reveal">
+  <div>
+    <h1 class="h3 mb-1 fw-bold" style="font-family: 'Syne', sans-serif;">Smart College Event Crowd Management</h1>
+    <p class="text-muted mb-0">
+      Monitor live crowd density, risk levels, and manage multiple events.
+    </p>
+  </div>
+</div>
+
+{% if announcements %}
+<div class="alert alert-info mb-4 border-0 reveal reveal-delay-1" style="background: rgba(56,189,248,0.1); color: #38bdf8;">
+  <h5 class="alert-heading fw-bold" style="font-family: 'Syne', sans-serif;">📢 Announcements</h5>
+  {% for announcement in announcements %}
+  <div class="mb-2">
+    <strong class="text-white">{{ announcement.title }}</strong><br>
+    <small>{{ announcement.message }}</small>
+  </div>
+  {% if not loop.last %}<hr style="opacity: 0.1;">{% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="row g-4 reveal reveal-delay-1">
+  {% if current_user.is_authenticated and current_user.role in ['admin', 'faculty_coordinator', 'host'] %}
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <h2 class="h5 mb-3 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Create New Event</h2>
+        <form method="post" action="{{ url_for('create_event') }}" class="vstack gap-2">
+          <div class="form-floating">
+            <input
+              type="text"
+              class="form-control"
+              id="name"
+              name="name"
+              placeholder="Tech Conference"
+              required
+            />
+            <label for="name">Event name</label>
+          </div>
+
+          <div class="form-floating">
+            <input
+              type="text"
+              class="form-control"
+              id="location"
+              name="location"
+              placeholder="Hall A, Main Campus"
+              required
+            />
+            <label for="location">Location</label>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="form-floating">
+                <input
+                  type="datetime-local"
+                  class="form-control"
+                  id="start_time"
+                  name="start_time"
+                  required
+                />
+                <label for="start_time">Start time</label>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="form-floating">
+                <input
+                  type="datetime-local"
+                  class="form-control"
+                  id="end_time"
+                  name="end_time"
+                  required
+                />
+                <label for="end_time">End time</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-floating">
+            <select class="form-select" id="event_type" name="event_type">
+              <option value="general">General Event</option>
+              <option value="cultural">Cultural Fest</option>
+              <option value="technical">Technical Event</option>
+              <option value="sports">Sports Event</option>
+              <option value="seminar">Seminar/Lecture</option>
+              <option value="convocation">Convocation</option>
+            </select>
+            <label for="event_type">Event Type</label>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="form-floating">
+                <input
+                  type="number"
+                  min="1"
+                  class="form-control"
+                  id="max_capacity"
+                  name="max_capacity"
+                  placeholder="500"
+                  required
+                />
+                <label for="max_capacity">Max capacity</label>
+              </div>
+            </div>
+            <div class="col-3">
+              <div class="form-floating">
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  class="form-control"
+                  id="safe_threshold"
+                  name="safe_threshold"
+                  value="70"
+                />
+                <label for="safe_threshold">Safe %</label>
+              </div>
+            </div>
+            <div class="col-3">
+              <div class="form-floating">
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  class="form-control"
+                  id="warning_threshold"
+                  name="warning_threshold"
+                  value="90"
+                />
+                <label for="warning_threshold">Warn %</label>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 mt-2">
+            Create event
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+  {% else %}
+  <div class="col-lg-12">
+  {% endif %}
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h2 class="h5 mb-0 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Active Events</h2>
+          <span class="badge bg-secondary">
+            {{ events|length }} event{{ '' if events|length == 1 else 's' }}
+          </span>
+        </div>
+
+        {% if events %}
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th scope="col">Event</th>
+                <th scope="col">Location</th>
+                <th scope="col">Schedule</th>
+                <th scope="col">Occupancy</th>
+                <th scope="col">Status</th>
+                <th scope="col" class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for event in events %}
+              <tr>
+                <td>
+                  <div class="d-flex align-items-center gap-3">
+                    {% if event.poster_filename %}
+                    <div style="width:54px; height:54px; overflow:hidden; border-radius: 12px; flex-shrink:0; border: 1px solid var(--border);">
+                      <img
+                        src="{{ url_for('static', filename='event_posters/' ~ event.poster_filename) }}"
+                        alt="Poster for {{ event.name }}"
+                        class="img-fluid"
+                        style="object-fit:cover; width:100%; height:100%;"
+                      />
+                    </div>
+                    {% endif %}
+                    <div>
+                      <div class="fw-semibold text-white">{{ event.name }}</div>
+                      <small class="text-muted">{{ event.event_type|capitalize }}</small>
+                    </div>
+                  </div>
+                </td>
+                <td class="text-muted small">{{ event.location }}</td>
+                <td>
+                  <div class="small text-muted">
+                    {{ event.start_time.strftime('%d %b, %H:%M') }}
+                  </div>
+                </td>
+                <td>
+                  <div class="small text-muted mb-1">
+                    {{ event.current_count }} / {{ event.max_capacity }}
+                    ({{ (event.occupancy_ratio * 100) | round(0) | int }}%)
+                  </div>
+                  <div class="progress" style="height: 6px;">
+                    <div
+                      class="progress-bar status-{{ event.status }}"
+                      role="progressbar"
+                      style="width: {{ (event.occupancy_ratio * 100) | round(0) | int }}%;"
+                    ></div>
+                  </div>
+                </td>
+                <td>
+                  <span class="badge status-badge status-{{ event.status }}">
+                    {{ event.status|capitalize }}
+                  </span>
+                </td>
+                <td class="text-end">
+                  <a
+                    href="{{ url_for('event_detail', event_id=event.id) }}"
+                    class="btn btn-sm btn-outline-primary"
+                  >
+                    Open
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <p class="mb-1">No events yet.</p>
+          <p class="small mb-0">
+            Events will appear here once they are created.
+          </p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+

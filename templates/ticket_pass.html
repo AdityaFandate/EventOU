@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Your Pass | Smart Event Crowd Management{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5 reveal">
+  <div class="col-md-7 col-lg-6">
+    <div class="card shadow-sm border-0 text-center">
+      <div class="card-body p-4 p-lg-5">
+        <h1 class="h4 mb-2 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Event pass</h1>
+        <p class="small text-muted mb-4">
+          Show this QR code at the gate. Staff can scan it with the system scanner
+          to verify your entry.
+        </p>
+
+        <div class="mb-4 p-3 rounded-4" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border);">
+          <h2 class="h5 mb-1 fw-bold text-white" style="font-family: 'Syne', sans-serif;">{{ ticket.event.name }}</h2>
+          <p class="small text-muted mb-0">
+            {{ ticket.event.location }}<br />
+            {{ ticket.event.start_time.strftime('%d %b %Y, %H:%M') }}
+          </p>
+        </div>
+
+        <div class="mb-4 p-3 bg-white rounded-4 shadow-lg d-inline-block" style="border: 4px solid var(--accent);">
+          <img
+            src="{{ qr_url }}"
+            alt="QR code for event pass"
+            class="img-fluid"
+            style="max-width: 240px; filter: contrast(1.1);"
+          />
+        </div>
+
+        <div class="mb-4">
+          <p class="small text-muted mb-1">
+            Ticket ID: <span class="text-white fw-bold">#{{ ticket.id }}</span>
+          </p>
+          <p class="small text-muted mb-0">
+            Student: <span class="text-white fw-bold">{{ ticket.guest_name if ticket.guest_name else ticket.student.name }}</span>
+          </p>
+          {% if ticket.team_name %}
+          <p class="small text-muted mb-1">
+            Team: <span class="text-accent fw-bold" style="color: var(--accent2);">{{ ticket.team_name }}</span>
+          </p>
+          {% endif %}
+          {% if ticket.member_details %}
+          <div class="mt-3 p-3 rounded-4 text-start" style="background: rgba(255,255,255,0.02); border: 1px dashed var(--border);">
+            <p class="small text-muted text-uppercase fw-bold mb-2" style="font-size: 0.6rem; letter-spacing: 1px;">Group Members</p>
+            <p class="small text-white mb-0" style="white-space: pre-line;">{{ ticket.member_details }}</p>
+          </div>
+          {% endif %}
+        </div>
+
+        {% if coupons %}
+        <div class="mt-5 border-top border-secondary pt-4 text-start">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="h6 mb-0 fw-bold text-white" style="font-family: 'Syne', sans-serif;">🍔 Associated Food Vouchers</h3>
+            <span class="badge rounded-pill bg-warning text-dark px-2 py-1" style="font-size: 0.65rem;">{{ coupons|length }} AVAILABLE</span>
+          </div>
+          
+          <div class="row g-3">
+            {% for coupon in coupons %}
+            <div class="col-12">
+              <div class="card border-0 overflow-hidden" style="background: #1a1a2e; border: 1px solid rgba(245,158,11,0.2) !important; border-radius: 20px;">
+                <div class="card-body p-0">
+                  <!-- Voucher Header-mini -->
+                  <div class="px-3 py-2 d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                    <span class="small fw-bold text-white" style="font-size: 0.75rem;">{{ coupon.coupon_name }}</span>
+                    {% if coupon.used %}
+                    <span class="badge bg-white text-success fw-bold" style="font-size: 0.6rem;">REDEEMED</span>
+                    {% else %}
+                    <span class="badge bg-white text-warning fw-bold" style="font-size: 0.6rem;">VALID</span>
+                    {% endif %}
+                  </div>
+
+                  <div class="p-3">
+                    <div class="row align-items-center">
+                      <div class="col-12">
+                        <div class="mb-2">
+                          <span class="small text-muted d-block text-uppercase" style="font-size: 0.6rem;">Food Item</span>
+                          <span class="fw-bold text-white" style="font-size: 0.9rem;">{{ coupon.food_item }}</span>
+                        </div>
+                        <div class="d-flex gap-3">
+                          <div>
+                            <span class="small text-muted d-block text-uppercase" style="font-size: 0.6rem;">Qty</span>
+                            <span class="small text-white fw-semibold">{{ coupon.quantity }}x</span>
+                          </div>
+                          {% if coupon.expiry_date %}
+                          <div>
+                            <span class="small text-muted d-block text-uppercase" style="font-size: 0.6rem;">Expiry</span>
+                            <span class="small {% if coupon.expiry_date < now %}text-danger{% else %}text-warning{% endif %} fw-semibold">
+                              {{ coupon.expiry_date.strftime('%H:%M') }}
+                            </span>
+                          </div>
+                          {% endif %}
+                        </div>
+                        
+                        {% if not coupon.used %}
+                        <div class="mt-3">
+                          <a href="{{ url_for('view_coupon', coupon_id=coupon.id) }}" class="btn btn-sm btn-warning w-100 py-1 fw-bold" style="font-size: 0.7rem;">Open Voucher</a>
+                        </div>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+

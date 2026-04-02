@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Coupon Verification | Smart Event Crowd Management{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5 reveal">
+  <div class="col-md-7 col-lg-5">
+    <div class="card border-0 shadow-lg overflow-hidden" style="background: #1a1a2e; border-radius: 30px;">
+      <div class="card-body p-0">
+        <!-- Result Header -->
+        <div class="p-4 text-center" style="background: linear-gradient(135deg, #f59e0b, #d97706); border-bottom: 2px dashed rgba(255,255,255,0.2);">
+          <h1 class="h4 mb-0 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Voucher Status</h1>
+        </div>
+
+        <div class="p-4 p-lg-5 text-center">
+          <div class="mb-4">
+            {% if "Success" in message or "valid" in message.lower() %}
+            <div class="mb-3 d-inline-block p-3 rounded-circle" style="background: rgba(48,209,133,0.1); border: 2px solid var(--clr-green);">
+              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="var(--clr-green)" class="bi bi-check2-circle" viewBox="0 0 16 16">
+                <path d="M2.5 8a5.5 5.5 0 0 1 8.25-4.764.5.5 0 0 0 .5-.866A6.5 6.5 0 1 0 14.5 8a.5.5 0 0 0-1 0 5.5 5.5 0 1 1-11 0z"/>
+                <path d="M15.354 3.354a.5.5 0 0 0-.708-.708L8 9.293 5.354 6.646a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0l7-7z"/>
+              </svg>
+            </div>
+            {% else %}
+            <div class="mb-3 d-inline-block p-3 rounded-circle" style="background: rgba(242,87,87,0.1); border: 2px solid var(--clr-red);">
+              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="var(--clr-red)" class="bi bi-x-circle" viewBox="0 0 16 16">
+                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+              </svg>
+            </div>
+            {% endif %}
+            
+            <h2 class="h5 mb-2 fw-bold text-white">{{ message }}</h2>
+          </div>
+
+          {% if coupon %}
+          <!-- Food Details Box -->
+          <div class="p-3 rounded-4 mb-4" style="background: rgba(245,158,11,0.05); border: 1px solid rgba(245,158,11,0.2);">
+            <div class="row align-items-center">
+              <div class="col-7 text-start border-end border-secondary border-opacity-25">
+                <span class="small text-muted d-block text-uppercase letter-spacing-05" style="font-size: 0.65rem;">Food Item</span>
+                <span class="h6 mb-0 fw-bold text-white">{{ coupon.food_item }}</span>
+              </div>
+              <div class="col-5 text-center">
+                <span class="small text-muted d-block text-uppercase letter-spacing-05" style="font-size: 0.65rem;">Quantity</span>
+                <span class="h6 mb-0 fw-bold text-white">{{ coupon.quantity }}x</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="text-start small mb-4">
+            <div class="d-flex justify-content-between text-muted mb-2">
+              <span>Meal Type:</span>
+              <span class="text-white fw-bold text-uppercase">{{ coupon.meal_type if coupon.meal_type != 'other' else 'General' }}</span>
+            </div>
+            <div class="d-flex justify-content-between text-muted mb-2">
+              <span>Voucher Name:</span>
+              <span class="text-white fw-semibold">{{ coupon.coupon_name }}</span>
+            </div>
+            {% if coupon.expiry_date %}
+            <div class="d-flex justify-content-between text-muted">
+              <span>Expiry:</span>
+              <span class="text-white fw-semibold">{{ coupon.expiry_date.strftime('%d %b %Y, %H:%M') }}</span>
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
+
+          <div class="d-grid gap-2">
+            <a href="{{ url_for('volunteer_scanner') }}" class="btn btn-primary py-2">Scan Next</a>
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary py-2">Back Home</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

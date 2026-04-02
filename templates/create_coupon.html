@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Create Food Coupon | Smart Event Crowd Management{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card shadow-sm auth-card">
+      <div class="card-body">
+        <div class="auth-header">
+          <h1>Create Food Coupon</h1>
+          <p class="auth-subtitle">
+            Generate a QR-based coupon for canteen use.
+          </p>
+        </div>
+
+        <form method="post" action="{{ url_for('create_coupon') }}" class="vstack gap-3">
+          <div class="form-floating">
+            <input
+              type="text"
+              class="form-control"
+              id="coupon_name"
+              name="coupon_name"
+              placeholder=" "
+              required
+            />
+            <label for="coupon_name">Coupon Name</label>
+          </div>
+
+          <div class="form-floating">
+            <input
+              type="text"
+              class="form-control"
+              id="food_item"
+              name="food_item"
+              placeholder=" "
+              required
+            />
+            <label for="food_item">Food Item</label>
+          </div>
+
+          <div class="form-floating">
+            <input
+              type="number"
+              class="form-control"
+              id="quantity"
+              name="quantity"
+              min="1"
+              value="1"
+              placeholder=" "
+              required
+            />
+            <label for="quantity">Quantity</label>
+          </div>
+
+          <div class="form-floating">
+            <select class="form-select" id="meal_type" name="meal_type" required>
+              <option value="other" selected>General / Other</option>
+              <option value="breakfast">Breakfast (7:00 AM - 10:30 AM)</option>
+              <option value="lunch">Lunch (12:00 PM - 3:30 PM)</option>
+              <option value="snacks">Evening Snacks (4:30 PM - 6:30 PM)</option>
+              <option value="dinner">Dinner (7:00 PM - 10:30 PM)</option>
+            </select>
+            <label for="meal_type">Meal Type & Time Window</label>
+          </div>
+
+          <div class="form-floating">
+            <select class="form-select" id="event_id" name="event_id" placeholder=" ">
+              <option value="">Select Event (Optional)</option>
+              {% for event in events %}
+              <option value="{{ event.id }}">{{ event.name }}</option>
+              {% endfor %}
+            </select>
+            <label for="event_id">Event</label>
+            <div class="form-text text-info small mt-1">
+              <i class="bi bi-info-circle me-1"></i> If you select an event and leave "Assign to Student" empty, the coupon will be automatically generated for <strong>all enrolled students</strong> of that event.
+            </div>
+          </div>
+
+          <div class="form-floating">
+            <select class="form-select" id="student_id" name="student_id" placeholder=" ">
+              <option value="">Select Student (Optional)</option>
+              {% for student in students %}
+              <option value="{{ student.id }}">{{ student.name }} ({{ student.roll_number or student.email }})</option>
+              {% endfor %}
+            </select>
+            <label for="student_id">Assign to Student</label>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 mt-1">
+            Create Coupon
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const eventSelect = document.getElementById('event_id');
+  const studentSelect = document.getElementById('student_id');
+  const allStudents = Array.from(studentSelect.options).map(opt => ({
+    value: opt.value,
+    text: opt.text
+  }));
+
+  eventSelect.addEventListener('change', async function() {
+    const eventId = this.value;
+    
+    // Clear student select and add loading indicator
+    studentSelect.innerHTML = '<option value="">Loading students...</option>';
+    studentSelect.disabled = true;
+
+    if (!eventId) {
+      // If no event selected, show all students (or keep it as it was)
+      studentSelect.innerHTML = '<option value="">Select Student (Optional)</option>';
+      allStudents.forEach(s => {
+        if (s.value) {
+          const opt = document.createElement('option');
+          opt.value = s.value;
+          opt.text = s.text;
+          studentSelect.appendChild(opt);
+        }
+      });
+      studentSelect.disabled = false;
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/events/${eventId}/students`);
+      const students = await response.json();
+
+      studentSelect.innerHTML = '<option value="">Select Student (Optional)</option>';
+      if (students.length === 0) {
+        studentSelect.innerHTML = '<option value="">No students enrolled in this event</option>';
+      } else {
+        students.forEach(student => {
+          const opt = document.createElement('option');
+          opt.value = student.id;
+          opt.text = `${student.name} (${student.roll_number})`;
+          studentSelect.appendChild(opt);
+        });
+      }
+      studentSelect.disabled = false;
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      studentSelect.innerHTML = '<option value="">Error loading students</option>';
+      studentSelect.disabled = false;
+    }
+  });
+});
+</script>
+{% endblock %}
+

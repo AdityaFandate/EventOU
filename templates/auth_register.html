@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Register | Smart Event Crowd Management{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-4 reveal">
+  <div class="col-md-7 col-lg-6">
+    <div class="card shadow-sm border-0">
+      <div class="card-body p-4 p-lg-5">
+        <h1 class="h4 mb-2 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Create an account</h1>
+        <p class="small text-muted mb-4">
+          Register using your college email ID and roll number for student access.
+        </p>
+
+        <form method="post" action="{{ url_for('register') }}" class="vstack gap-3">
+          <div class="form-floating">
+            <input
+              type="text"
+              class="form-control"
+              id="name"
+              name="name"
+              placeholder=" "
+              required
+            />
+            <label for="name">Full name</label>
+          </div>
+
+          <div class="form-floating">
+            <input
+              type="email"
+              class="form-control"
+              id="email"
+              name="email"
+              placeholder=" "
+              required
+            />
+            <label for="email">College Email ID</label>
+          </div>
+
+          <div class="form-floating">
+            <input
+              type="text"
+              class="form-control"
+              id="roll_number"
+              name="roll_number"
+              placeholder=" "
+            />
+            <label for="roll_number">Roll Number (Optional)</label>
+          </div>
+
+          <div class="form-floating">
+            <input
+              type="password"
+              class="form-control"
+              id="password"
+              name="password"
+              placeholder=" "
+              required
+            />
+            <label for="password">Password</label>
+          </div>
+
+          <div class="form-floating">
+            <select class="form-select" id="role" name="role" placeholder=" ">
+              <option value="student" selected>Student</option>
+              <option value="host">Event Host</option>
+              <option value="faculty_coordinator">Faculty Coordinator</option>
+              <option value="volunteer">Student Volunteer</option>
+              <option value="security">Security</option>
+              <option value="canteen_owner">Canteen Owner</option>
+            </select>
+            <label for="role">Account type</label>
+          </div>
+
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="is_guest" name="is_guest">
+            <label class="form-check-label text-muted small" for="is_guest">
+              Guest/Alumni (Temporary pass)
+            </label>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 py-2 mt-2">
+            Sign up
+          </button>
+        </form>
+
+        <p class="small text-muted mt-4 mb-0 text-center">
+          Already registered?
+          <a href="{{ url_for('login') }}" class="text-accent text-decoration-none fw-semibold" style="color: var(--accent);">Log in</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+

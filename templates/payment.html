@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Payment | Smart Event Crowd Management{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5 reveal">
+  <div class="col-md-8 col-lg-6">
+    <div class="card shadow-lg border-0 overflow-hidden" style="border-radius: 24px; background: var(--card);">
+      <div class="card-header py-4 text-center border-0" style="background: linear-gradient(135deg, #f3475e, #d62d44);">
+        <h1 class="h3 mb-0 fw-bold text-white" style="font-family: 'Syne', sans-serif;">Checkout</h1>
+        <p class="text-white-50 small mb-0 mt-1">Complete your registration</p>
+      </div>
+      <div class="card-body p-4 p-lg-5">
+        <h2 class="h5 mb-4 fw-bold text-white">Order Summary</h2>
+        
+        <div class="vstack gap-3 mb-4">
+          {% for ticket in tickets %}
+          <div class="d-flex justify-content-between align-items-center p-3 rounded-4 bg-surface border border-secondary border-opacity-10">
+            <div>
+              <div class="text-white fw-semibold small">{{ ticket.event.name }}</div>
+              <div class="text-muted small">Pass #{{ loop.index }} (ID: #{{ ticket.id }})</div>
+            </div>
+            <div class="text-white fw-bold">₹{{ "%.2f"|format(ticket.event.price) }}</div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center p-4 rounded-4 mb-5" style="background: rgba(243, 71, 94, 0.05); border: 1px solid rgba(243, 71, 94, 0.2);">
+          <div class="text-white-50 fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 1px;">Total Amount</div>
+          <div class="h3 mb-0 fw-bold" style="color: #f3475e;">₹{{ "%.2f"|format(total_price) }}</div>
+        </div>
+
+        <p class="small text-muted mb-4 text-center">
+          <i class="bi bi-shield-lock me-2"></i> This is a secure demo payment. No real money will be charged.
+        </p>
+
+        <form method="post" class="vstack gap-4">
+          <div class="form-floating">
+            <input
+              type="text"
+              class="form-control bg-surface border-secondary border-opacity-25"
+              id="card"
+              placeholder="Card Number"
+              value="4242 4242 4242 4242"
+              required
+            />
+            <label for="card">Card number (Demo)</label>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-6">
+              <div class="form-floating">
+                <input type="text" class="form-control bg-surface border-secondary border-opacity-25" id="expiry" placeholder="MM/YY" value="12/26" required />
+                <label for="expiry">Expiry</label>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="form-floating">
+                <input type="password" class="form-control bg-surface border-secondary border-opacity-25" id="cvv" placeholder="CVV" value="123" required />
+                <label for="cvv">CVV</label>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-lg w-100 py-3 fw-bold text-white" 
+                  style="background: #f3475e; border-radius: 12px; font-size: 1.1rem; box-shadow: 0 8px 24px rgba(243, 71, 94, 0.3);">
+            Pay ₹{{ "%.2f"|format(total_price) }} Now
+          </button>
+          
+          <div class="text-center">
+            <a href="{{ url_for('my_tickets') }}" class="text-muted small text-decoration-none hover-link">Cancel and return</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+
